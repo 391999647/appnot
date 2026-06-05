@@ -12,12 +12,8 @@ import com.tencent.kuikly.core.render.android.expand.KuiklyRenderViewBaseDelegat
 import com.tencent.kuikly.core.render.android.IKuiklyRenderExport
 import com.tencent.kuikly.core.render.android.exception.ErrorReason
 import com.tencent.kuikly.core.render.android.performace.KRMonitorType
+import java.io.File
 
-/**
- * NoteApp Android 入口 Activity
- *
- * 使用 KuiklyRenderView 渲染 Kuikly 页面
- */
 class MainActivity : ComponentActivity() {
 
     private lateinit var kuiklyRenderViewDelegator: KuiklyRenderViewBaseDelegator
@@ -37,6 +33,8 @@ class MainActivity : ComponentActivity() {
     private fun initKuikly() {
         AndroidContextHolder.init(this)
         AppRepo.initialize()
+
+        val bundleDir = File(filesDir, "noteapp").also { it.mkdirs() }
 
         container = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -84,7 +82,7 @@ class MainActivity : ComponentActivity() {
         )
         kuiklyRenderViewDelegator.onAttach(
             container,
-            "",
+            bundleDir.absolutePath,
             "NoteListPage",
             pageData
         )
