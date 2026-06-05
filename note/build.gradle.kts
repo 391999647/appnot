@@ -39,6 +39,7 @@ kotlin {
                 implementation("com.tencent.kuikly-open:core:2.4.0-2.0.21")
                 implementation("com.tencent.kuikly-open:core-render-android:2.4.0-2.0.21")
                 implementation("androidx.activity:activity-ktx:1.8.2")
+                implementation("androidx.security:security-crypto:1.1.0-alpha06")
             }
         }
         val iosMain by creating { dependsOn(commonMain) }
@@ -63,6 +64,9 @@ dependencies {
 android {
     namespace = "com.noteapp"
     compileSdk = 34
+    buildFeatures {
+        buildConfig = true
+    }
     defaultConfig {
         applicationId = "com.noteapp"
         minSdk = 24
@@ -71,8 +75,14 @@ android {
         versionName = "1.0.0"
     }
     buildTypes {
+        debug {
+            versionNameSuffix = "-debug"
+            buildConfigField("boolean", "IS_DEBUG", "true")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            buildConfigField("boolean", "IS_DEBUG", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -1,5 +1,4 @@
 # Kuikly framework keep rules
--keep class com.tencent.kuikly.** { *; }
 -keep class com.tencent.kuikly.core.android.KuiklyCoreEntry { *; }
 -keep class com.tencent.kuikly.core.IKuiklyCoreEntry { *; }
 -keep class com.tencent.kuikly.core.IKuiklyCoreEntry$Delegate { *; }
@@ -21,3 +20,6 @@
 # Kotlin serialization
 -keepattributes *Annotation*, InnerClasses
 -keep class kotlinx.serialization.** { *; }
+
+# Security crypto
+-keep class androidx.security.crypto.** { *; }

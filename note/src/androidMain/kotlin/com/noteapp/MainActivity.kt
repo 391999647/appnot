@@ -31,9 +31,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initKuikly() {
-        AndroidContextHolder.init(this)
-        AppRepo.initialize()
-
         val bundleDir = File(filesDir, "noteapp").also { it.mkdirs() }
 
         container = FrameLayout(this).apply {
@@ -108,6 +105,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        AndroidContextHolder.cleanup()
         super.onDestroy()
         kuiklyRenderViewDelegator.onDetach()
     }
