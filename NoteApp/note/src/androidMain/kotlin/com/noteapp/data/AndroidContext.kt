@@ -1,14 +1,20 @@
 package com.noteapp.data
 
-import android.annotation.SuppressLint
 import android.content.Context
 
+/**
+ * 全局 Android Context 持有者
+ * 用于在 commonMain 代码中访问 Android Context
+ */
 object AndroidContextHolder {
-    @SuppressLint("StaticFieldLeak")
-    lateinit var applicationContext: Context
-        private set
+    private var _applicationContext: Context? = null
+
+    val applicationContext: Context
+        get() = _applicationContext ?: throw IllegalStateException(
+            "AndroidContextHolder not initialized. Call init() first."
+        )
 
     fun init(context: Context) {
-        applicationContext = context.applicationContext
+        _applicationContext = context.applicationContext
     }
 }

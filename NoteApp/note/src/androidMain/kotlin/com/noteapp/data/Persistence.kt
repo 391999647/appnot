@@ -4,15 +4,14 @@ import android.content.Context
 import android.util.Log
 import java.io.File
 
-private val appDir: File by lazy {
+private fun getAppDir(): File {
     val ctx = AndroidContextHolder.applicationContext
-    File(ctx.filesDir, "noteapp")
+    return File(ctx.filesDir, "noteapp").also { it.mkdirs() }
 }
 
 actual fun savePersistentData(key: String, value: String) {
     try {
-        val dir = appDir
-        dir.mkdirs()
+        val dir = getAppDir()
         File(dir, key).writeText(value)
     } catch (e: Exception) {
         Log.e("NoteApp", "savePersistentData failed: key=$key", e)
@@ -21,7 +20,7 @@ actual fun savePersistentData(key: String, value: String) {
 
 actual fun loadPersistentData(key: String): String {
     return try {
-        val file = File(appDir, key)
+        val file = File(getAppDir(), key)
         if (file.exists()) file.readText() else ""
     } catch (e: Exception) {
         Log.e("NoteApp", "loadPersistentData failed: key=$key", e)

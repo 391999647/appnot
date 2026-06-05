@@ -1,50 +1,80 @@
-# Gradle
+```
+# Dependencies
 .gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 
-# IDE
-.idea/
-*.iml
-*.iws
-*.ipr
-.vscode/
-
-# Kotlin
-.kotlin/
-kotlin-js-store/
-
-# Node / Webpack
-node_modules/
+# Logs and temp files
 *.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Build outputs (keep wrapper jar)
-NoteApp/build/
-NoteApp/note/build/
-NoteApp/build/js/
+# Coverage
+coverage/
+htmlcov/
+.coverage
 
-# Environment/Config
-.env
-.env.local
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+.eggs/
 
-# CloudStudio / editor tools
-.codebuddy/
-recent_files/
-tools/
-nosleep
+# Node
+node_modules/
 
-# Old template files
-.clang-tidy
-main.cpp
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
 
-# Agent/workspace files
-AGENT_*.md
-KuiklyUI-official/
+# C/C++
+*.o
+*.a
+*.obj
+*.out
+*.dll
+*.so
 
-
-# Screenshots / temp
-img/*.png
+# Compressed
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
