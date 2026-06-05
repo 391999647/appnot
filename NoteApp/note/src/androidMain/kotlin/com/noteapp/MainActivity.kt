@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
 
     private fun initKuikly() {
         AndroidContextHolder.init(this)
+        AppRepo.initialize()
 
         container = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(

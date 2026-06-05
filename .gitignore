@@ -41,5 +41,10 @@ nosleep
 .clang-tidy
 main.cpp
 
+# Agent/workspace files
+AGENT_*.md
+KuiklyUI-official/
+
+
 # Screenshots / temp
 img/*.png

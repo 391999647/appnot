@@ -38,7 +38,7 @@ class NoteRepository {
     var lastLoadError: String? = null
         private set
 
-    init {
+    fun load() {
         loadFromStorage()
     }
 
