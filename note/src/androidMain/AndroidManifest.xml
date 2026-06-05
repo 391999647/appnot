@@ -9,8 +9,7 @@
         android:name=".NoteApp"
         android:label="NoteApp"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
-        android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_edit">
+        android:allowBackup="true">
 
         <activity
             android:name="com.noteapp.MainActivity"

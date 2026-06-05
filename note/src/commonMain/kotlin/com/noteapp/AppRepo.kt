@@ -9,6 +9,7 @@ import com.noteapp.data.NoteRepository
  * 改为通过 Pager 构造函数注入 Repository 实例。
  */
 object AppRepo {
+    @Volatile
     private var _repo: NoteRepository? = null
 
     val repo: NoteRepository

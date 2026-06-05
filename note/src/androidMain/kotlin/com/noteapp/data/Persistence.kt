@@ -3,7 +3,7 @@ package com.noteapp.data
 import android.content.Context
 import android.util.Log
 import androidx.security.crypto.EncryptedFile
-import androidx.security.crypto.MasterKey
+import androidx.security.crypto.MasterKeys
 import java.io.File
 
 private val appDir: File by lazy {
@@ -11,18 +11,15 @@ private val appDir: File by lazy {
     File(ctx.filesDir, "noteapp")
 }
 
-private val masterKey: MasterKey by lazy {
-    val ctx = AndroidContextHolder.applicationContext!!
-    MasterKey.Builder(ctx)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+private val masterKeyAlias: String by lazy {
+    MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
 }
 
 private fun encryptedFile(file: File): EncryptedFile {
     return EncryptedFile.Builder(
-        AndroidContextHolder.applicationContext!!,
         file,
-        masterKey,
+        AndroidContextHolder.applicationContext!!,
+        masterKeyAlias,
         EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
     ).build()
 }

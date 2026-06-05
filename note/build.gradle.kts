@@ -29,7 +29,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("com.tencent.kuikly-open:core:2.4.0-2.0.21")
                 implementation("com.tencent.kuikly-open:core-annotations:2.4.0-2.0.21")
             }
@@ -39,13 +39,13 @@ kotlin {
                 implementation("com.tencent.kuikly-open:core:2.4.0-2.0.21")
                 implementation("com.tencent.kuikly-open:core-render-android:2.4.0-2.0.21")
                 implementation("androidx.activity:activity-ktx:1.8.2")
-                implementation("androidx.security:security-crypto:1.1.0-alpha06")
+                implementation("androidx.security:security-crypto:1.0.0")
+                implementation("androidx.multidex:multidex:2.0.1")
             }
         }
-        val iosMain by creating { dependsOn(commonMain) }
-        val iosX64Main by getting { dependsOn(iosMain) }
-        val iosArm64Main by getting { dependsOn(iosMain) }
-        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
+        val iosX64Main by getting
+        val iosArm64Main by getting
+        val iosSimulatorArm64Main by getting
         // val ohosArm64Main by creating { dependsOn(commonMain) }
         val jsMain by getting
     }
@@ -73,6 +73,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        multiDexEnabled = true
     }
     buildTypes {
         debug {

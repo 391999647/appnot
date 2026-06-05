@@ -25,8 +25,12 @@ class MainActivity : ComponentActivity() {
         try {
             initKuikly()
         } catch (e: Throwable) {
-            Log.e("NoteApp", "CRASH in onCreate", e)
-            android.widget.Toast.makeText(this, "Crash: " + e.message, android.widget.Toast.LENGTH_LONG).show()
+            val msg = "CRASH in onCreate: ${e.javaClass.name}: ${e.message}\n${e.stackTrace.joinToString("\n") { "    $it" }}"
+            Log.e("NoteApp-CRASH", msg)
+            try {
+                File(filesDir, "crash_log.txt").appendText("MainActivity.onCreate: $msg\n\n")
+            } catch (_: Exception) {}
+            android.widget.Toast.makeText(this, "Crash: ${e.javaClass.simpleName}: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
@@ -71,18 +75,34 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        kuiklyRenderViewDelegator = KuiklyRenderViewBaseDelegator(delegate)
+        try {
+            kuiklyRenderViewDelegator = KuiklyRenderViewBaseDelegator(delegate)
+            logToFile("KuiklyRenderViewBaseDelegator created OK")
+        } catch (e: Throwable) {
+            val msg = "KuiklyRenderViewBaseDelegator init failed: ${e.javaClass.name}: ${e.message}"
+            Log.e("NoteApp-CRASH", msg, e)
+            logToFile(msg)
+            throw e
+        }
 
         val pageData = mapOf<String, Any>(
             "appId" to 1,
             "debug" to 1
         )
-        kuiklyRenderViewDelegator.onAttach(
-            container,
-            bundleDir.absolutePath,
-            "NoteListPage",
-            pageData
-        )
+        try {
+            kuiklyRenderViewDelegator.onAttach(
+                container,
+                bundleDir.absolutePath,
+                "NoteListPage",
+                pageData
+            )
+            logToFile("onAttach OK")
+        } catch (e: Throwable) {
+            val msg = "onAttach failed: ${e.javaClass.name}: ${e.message}"
+            Log.e("NoteApp-CRASH", msg, e)
+            logToFile(msg)
+            throw e
+        }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -94,19 +114,23 @@ class MainActivity : ComponentActivity() {
         })
     }
 
+    private fun logToFile(msg: String) {
+        try { File(filesDir, "crash_log.txt").appendText("$msg\n") } catch (_: Exception) {}
+    }
+
     override fun onResume() {
         super.onResume()
-        kuiklyRenderViewDelegator.onResume()
+        if (::kuiklyRenderViewDelegator.isInitialized) kuiklyRenderViewDelegator.onResume()
     }
 
     override fun onPause() {
         super.onPause()
-        kuiklyRenderViewDelegator.onPause()
+        if (::kuiklyRenderViewDelegator.isInitialized) kuiklyRenderViewDelegator.onPause()
     }
 
     override fun onDestroy() {
-        AndroidContextHolder.cleanup()
+        if (::kuiklyRenderViewDelegator.isInitialized) kuiklyRenderViewDelegator.onDetach()
         super.onDestroy()
-        kuiklyRenderViewDelegator.onDetach()
+        AndroidContextHolder.cleanup()
     }
 }
