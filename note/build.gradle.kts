@@ -41,6 +41,7 @@ kotlin {
                 implementation("androidx.activity:activity-ktx:1.8.2")
                 implementation("androidx.security:security-crypto:1.0.0")
                 implementation("androidx.multidex:multidex:2.0.1")
+                implementation("androidx.recyclerview:recyclerview:1.3.2")
             }
         }
         val iosX64Main by getting

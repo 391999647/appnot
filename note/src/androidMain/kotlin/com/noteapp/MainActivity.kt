@@ -1,19 +1,33 @@
 package com.noteapp
 
-import android.util.Log
-import androidx.activity.ComponentActivity
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.FrameLayout
+import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import com.noteapp.data.AndroidContextHolder
+import com.noteapp.pages.NoteEditPage
+import com.noteapp.pages.NoteListPage
+import com.noteapp.pages.RecycleBinPage
+import com.tencent.kuikly.core.manager.BridgeManager
+import com.tencent.kuikly.core.render.android.IKuiklyRenderExport
 import com.tencent.kuikly.core.render.android.context.KuiklyRenderCoreExecuteModeBase
+import com.tencent.kuikly.core.render.android.exception.ErrorReason
 import com.tencent.kuikly.core.render.android.expand.KuiklyRenderViewBaseDelegator
 import com.tencent.kuikly.core.render.android.expand.KuiklyRenderViewBaseDelegatorDelegate
-import com.tencent.kuikly.core.render.android.IKuiklyRenderExport
-import com.tencent.kuikly.core.render.android.exception.ErrorReason
 import com.tencent.kuikly.core.render.android.performace.KRMonitorType
 import java.io.File
 
+/**
+ * MainActivity - 应用主入口
+ *
+ * 职责：
+ * 1. 初始化 Kuikly 渲染引擎并加载 NoteListPage
+ * 2. 捕获所有初始化异常，崩溃时跳转到 CrashActivity
+ * 3. 处理返回键事件，传递给 Kuikly 页面栈
+ */
 class MainActivity : ComponentActivity() {
 
     private lateinit var kuiklyRenderViewDelegator: KuiklyRenderViewBaseDelegator
@@ -25,16 +39,29 @@ class MainActivity : ComponentActivity() {
         try {
             initKuikly()
         } catch (e: Throwable) {
-            val msg = "CRASH in onCreate: ${e.javaClass.name}: ${e.message}\n${e.stackTrace.joinToString("\n") { "    $it" }}"
-            Log.e("NoteApp-CRASH", msg)
-            try {
-                File(filesDir, "crash_log.txt").appendText("MainActivity.onCreate: $msg\n\n")
-            } catch (_: Exception) {}
-            android.widget.Toast.makeText(this, "Crash: ${e.javaClass.simpleName}: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            val msg = "CRASH in MainActivity.onCreate: ${e.javaClass.name}: ${e.message}\n${e.stackTraceToString()}"
+            Log.e("NoteApp-CRASH", msg, e)
+            logToFile("MainActivity.onCreate: $msg")
+
+            // 启动崩溃展示页面
+            startCrashActivity(msg)
         }
     }
 
+    /**
+     * 初始化 Kuikly 渲染引擎
+     */
     private fun initKuikly() {
+        // 手动注册所有页面
+        Log.d("NoteApp", "Registering pages...")
+        Log.d("NoteApp", "NoteListPage exists before reg? ${BridgeManager.isPageExist("NoteListPage")}")
+        BridgeManager.registerPageRouter("NoteListPage") { NoteListPage() }
+        BridgeManager.registerPageRouter("NoteEditPage") { NoteEditPage() }
+        BridgeManager.registerPageRouter("RecycleBinPage") { RecycleBinPage() }
+        Log.d("NoteApp", "NoteListPage exists after reg? ${BridgeManager.isPageExist("NoteListPage")}")
+        Log.d("NoteApp", "Pages registered. BridgeManager.init=${BridgeManager.isDidInit()}")
+        logToFile("Pages registered manually")
+
         val bundleDir = File(filesDir, "noteapp").also { it.mkdirs() }
 
         container = FrameLayout(this).apply {
@@ -63,7 +90,12 @@ class MainActivity : ComponentActivity() {
                 errorReason: ErrorReason,
                 executeMode: KuiklyRenderCoreExecuteModeBase
             ) {
-                Log.e("NoteApp", "Unhandled: ${errorReason.name}", throwable)
+                val msg = "Kuikly Unhandled: ${errorReason.name}\n${throwable.stackTraceToString()}"
+                Log.e("NoteApp", msg, throwable)
+                logToFile(msg)
+
+                // Kuikly 内部异常也展示崩溃页面
+                startCrashActivity(msg)
             }
 
             override fun onPageLoadComplete(
@@ -71,7 +103,14 @@ class MainActivity : ComponentActivity() {
                 errorReason: ErrorReason?,
                 executeMode: KuiklyRenderCoreExecuteModeBase
             ) {
-                Log.d("NoteApp", "Page load: isSucceed=$isSucceed errorReason=${errorReason?.name}")
+                val status = if (isSucceed) "SUCCESS" else "FAILED"
+                Log.d("NoteApp", "Page load $status: errorReason=${errorReason?.name}")
+
+                if (!isSucceed) {
+                    val msg = "页面加载失败: ${errorReason?.name}"
+                    logToFile(msg)
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                }
             }
         }
 
@@ -89,6 +128,7 @@ class MainActivity : ComponentActivity() {
             "appId" to 1,
             "debug" to 1
         )
+
         try {
             kuiklyRenderViewDelegator.onAttach(
                 container,
@@ -96,7 +136,7 @@ class MainActivity : ComponentActivity() {
                 "NoteListPage",
                 pageData
             )
-            logToFile("onAttach OK")
+            logToFile("onAttach OK - page=NoteListPage")
         } catch (e: Throwable) {
             val msg = "onAttach failed: ${e.javaClass.name}: ${e.message}"
             Log.e("NoteApp-CRASH", msg, e)
@@ -114,22 +154,43 @@ class MainActivity : ComponentActivity() {
         })
     }
 
+    /**
+     * 启动崩溃展示页面
+     */
+    private fun startCrashActivity(report: String) {
+        val intent = Intent(this, CrashActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(CrashActivity.EXTRA_CRASH_REPORT, report)
+        }
+        startActivity(intent)
+        finishAffinity()
+    }
+
     private fun logToFile(msg: String) {
-        try { File(filesDir, "crash_log.txt").appendText("$msg\n") } catch (_: Exception) {}
+        try {
+            File(filesDir, "crash_log.txt").appendText("$msg\n")
+        } catch (_: Exception) {
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (::kuiklyRenderViewDelegator.isInitialized) kuiklyRenderViewDelegator.onResume()
+        if (::kuiklyRenderViewDelegator.isInitialized) {
+            kuiklyRenderViewDelegator.onResume()
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        if (::kuiklyRenderViewDelegator.isInitialized) kuiklyRenderViewDelegator.onPause()
+        if (::kuiklyRenderViewDelegator.isInitialized) {
+            kuiklyRenderViewDelegator.onPause()
+        }
     }
 
     override fun onDestroy() {
-        if (::kuiklyRenderViewDelegator.isInitialized) kuiklyRenderViewDelegator.onDetach()
+        if (::kuiklyRenderViewDelegator.isInitialized) {
+            kuiklyRenderViewDelegator.onDetach()
+        }
         super.onDestroy()
         AndroidContextHolder.cleanup()
     }

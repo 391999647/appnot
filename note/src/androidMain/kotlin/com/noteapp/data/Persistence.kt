@@ -29,6 +29,7 @@ actual fun savePersistentData(key: String, value: String) {
         val dir = appDir
         dir.mkdirs()
         val file = File(dir, key)
+        file.delete() // EncryptedFile.openFileOutput requires the file NOT to exist
         encryptedFile(file).openFileOutput().use { outputStream ->
             outputStream.write(value.toByteArray(Charsets.UTF_8))
         }

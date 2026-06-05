@@ -12,7 +12,7 @@
 -keep @interface com.tencent.kuikly.core.annotations.** { *; }
 
 # Keep all page classes annotated with @Page
--keep class * annotated with com.tencent.kuikly.core.annotations.Page { *; }
+-keep @com.tencent.kuikly.core.annotations.Page class * { *; }
 
 # Keep App classes
 -keep class com.noteapp.** { *; }
@@ -23,3 +23,8 @@
 
 # Security crypto
 -keep class androidx.security.crypto.** { *; }
+
+# Tink / Google crypto annotations (not required at runtime)
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn javax.annotation.concurrent.GuardedBy

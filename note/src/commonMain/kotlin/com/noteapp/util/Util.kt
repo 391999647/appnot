@@ -17,7 +17,7 @@ object UUID {
             when (i) {
                 8, 13, 18, 23 -> sb.append('-')
                 14 -> sb.append('4')
-                19 -> sb.append(chars[Random.nextInt(4) * 4 + 8]) // variant bits
+                19 -> sb.append(chars[8 + Random.nextInt(4)]) // variant bits: 8=8,9,10,11 → '8','9','a','b'
                 else -> sb.append(chars[Random.nextInt(16)])
             }
         }

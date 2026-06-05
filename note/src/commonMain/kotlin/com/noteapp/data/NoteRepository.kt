@@ -1,8 +1,9 @@
 package com.noteapp.data
 
 import com.noteapp.model.Note
-import com.noteapp.model.Tag
 import com.noteapp.model.NoteTag
+import com.noteapp.model.Tag
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -229,13 +230,16 @@ class NoteRepository {
 
     // === Serialization ===
 
+    @Serializable
+    private data class StorageData(
+        val version: Int,
+        val notes: List<Note>,
+        val tags: List<Tag>,
+        val noteTags: List<NoteTag>
+    )
+
     fun serialize(): String {
-        val data = mapOf(
-            "version" to DATA_VERSION,
-            "notes" to notes,
-            "tags" to tags,
-            "noteTags" to noteTags
-        )
+        val data = StorageData(DATA_VERSION, notes.toList(), tags.toList(), noteTags.toList())
         return json.encodeToString(data)
     }
 
