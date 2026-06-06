@@ -3,12 +3,13 @@ package com.noteapp.util
 import kotlin.random.Random
 
 /**
- * UUID 生成工具 - 使用加密级安全随机数
+ * UUID 生成工具 - 使用伪随机数生成器
  */
 object UUID {
     /**
      * 生成 UUID v4 格式的字符串
-     * 注: 生产环境建议使用 kotlin-uuid 库或平台原生 UUID API
+     * 注: 使用 kotlin.random.Random，非加密安全。
+     *     如需加密安全 UUID，建议使用平台原生 API（如 java.util.UUID 或 SecureRandom）。
      */
     fun generate(): String {
         val chars = "0123456789abcdef"

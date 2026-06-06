@@ -10,3 +10,8 @@ actual fun savePersistentData(key: String, value: String) {
 actual fun loadPersistentData(key: String): String {
     return NSUserDefaults.standardUserDefaults.stringForKey(key) ?: ""
 }
+
+actual fun removePersistentData(key: String) {
+    NSUserDefaults.standardUserDefaults.removeObjectForKey(key)
+    NSUserDefaults.standardUserDefaults.synchronize()
+}

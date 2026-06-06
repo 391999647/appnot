@@ -8,3 +8,7 @@ actual fun loadPersistentData(key: String): String {
     val result: String = js("localStorage.getItem(key) || ''")
     return result
 }
+
+actual fun removePersistentData(key: String) {
+    js("localStorage.removeItem(key)")
+}

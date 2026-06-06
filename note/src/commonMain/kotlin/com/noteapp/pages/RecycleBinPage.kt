@@ -8,6 +8,7 @@ import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
 import com.tencent.kuikly.core.views.View
 import com.tencent.kuikly.core.views.Text
+import com.tencent.kuikly.core.views.Image
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.module.RouterModule
 import com.noteapp.AppRepo
@@ -23,6 +24,10 @@ import com.tencent.kuikly.core.timer.clearTimeout
 internal class RecycleBinPage : Pager() {
 
     private var deletedNotes by observableList<Note>()
+
+    // Batch operations
+    private var isMultiSelectMode by observable(false)
+    private var selectedNoteIds by observableList<String>()
 
     // Toast
     private var toastMessage by observable("")
@@ -82,6 +87,59 @@ internal class RecycleBinPage : Pager() {
         }
     }
 
+    private fun toggleMultiSelectMode() {
+        isMultiSelectMode = !isMultiSelectMode
+        if (!isMultiSelectMode) {
+            selectedNoteIds.clear()
+        }
+    }
+
+    private fun toggleNoteSelection(noteId: String) {
+        if (selectedNoteIds.contains(noteId)) {
+            selectedNoteIds.removeAll { it == noteId }
+        } else {
+            selectedNoteIds.add(noteId)
+        }
+        if (selectedNoteIds.isEmpty()) {
+            isMultiSelectMode = false
+        }
+    }
+
+    private fun selectAllNotes() {
+        selectedNoteIds.clear()
+        selectedNoteIds.addAll(deletedNotes.map { it.id })
+    }
+
+    private fun deselectAllNotes() {
+        selectedNoteIds.clear()
+    }
+
+    private fun batchRestore() {
+        val ids = selectedNoteIds.toList()
+        AppRepo.repo.restoreNotes(ids)
+        selectedNoteIds.clear()
+        isMultiSelectMode = false
+        loadDeletedNotes()
+        showToast("已恢复 ${ids.size} 篇笔记")
+    }
+
+    private fun batchDeletePermanently() {
+        val ids = selectedNoteIds.toList()
+        showConfirm("批量永久删除", "确定要永久删除选中的 ${ids.size} 篇笔记吗？此操作不可恢复。") {
+            AppRepo.repo.permanentlyDeleteNotes(ids)
+            selectedNoteIds.clear()
+            isMultiSelectMode = false
+            loadDeletedNotes()
+            showToast("已永久删除 ${ids.size} 篇笔记")
+        }
+    }
+
+    override fun pageWillDestroy() {
+        super.pageWillDestroy()
+        toastTimerRef?.let { clearTimeout(it) }
+        toastTimerRef = null
+    }
+
     override fun body(): ViewBuilder {
         val ctx = this
         return {
@@ -97,10 +155,40 @@ internal class RecycleBinPage : Pager() {
                 View {
                     attr { padding(right = 16f) }
                     event { click { ctx.acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage() } }
-                    Text { attr { text("${Icons.BACK} 返回"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.primary) } }
+                    View {
+                        attr { flexDirectionRow(); alignItemsCenter() }
+                        Image { attr { src(Icons.BACK); width(16f); height(16f); marginRight(4f) } }
+                        Text { attr { text("返回"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.primary) } }
+                    }
                 }
-                Text { attr { text("${Icons.DELETE} 回收站"); fontSize(ThemeStyles.fontSizeSubtitle); fontWeightBold(); flex(1f) } }
-                if (ctx.deletedNotes.isNotEmpty()) {
+                if (ctx.isMultiSelectMode) {
+                    View {
+                        attr { flex(1f); flexDirectionRow(); alignItemsCenter() }
+                        Text { attr { text("已选 ${ctx.selectedNoteIds.size}/${ctx.deletedNotes.size}"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textPrimary); flex(1f) } }
+                        View {
+                            attr { padding(top = 4f, left = 8f, bottom = 4f, right = 8f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(6f) }
+                            event { click { if (ctx.selectedNoteIds.size == ctx.deletedNotes.size) ctx.deselectAllNotes() else ctx.selectAllNotes() } }
+                            Text { attr { text(if (ctx.selectedNoteIds.size == ctx.deletedNotes.size) "取消全选" else "全选"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        }
+                        View {
+                            attr { padding(top = 4f, left = 8f, bottom = 4f, right = 8f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip) }
+                            event { click { ctx.toggleMultiSelectMode() } }
+                            Text { attr { text("取消"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        }
+                    }
+                } else {
+                    View {
+                        attr { flexDirectionRow(); alignItemsCenter(); flex(1f) }
+                        Image { attr { src(Icons.DELETE); width(20f); height(20f); marginRight(6f) } }
+                        Text { attr { text("回收站"); fontSize(ThemeStyles.fontSizeSubtitle); fontWeightBold() } }
+                    }
+                }
+                if (!ctx.isMultiSelectMode && ctx.deletedNotes.isNotEmpty()) {
+                    View {
+                        attr { padding(top = 4f, left = 8f, bottom = 4f, right = 8f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(6f) }
+                        event { click { ctx.toggleMultiSelectMode() } }
+                        Image { attr { src(Icons.SELECT_ALL); width(18f); height(18f) } }
+                    }
                     View {
                         attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
                         event { click { ctx.emptyTrash() } }
@@ -116,38 +204,94 @@ internal class RecycleBinPage : Pager() {
                 if (ctx.deletedNotes.isEmpty()) {
                     View {
                         attr { flex(1f); alignItemsCenter(); justifyContentCenter(); paddingTop(100f) }
-                        Text { attr { text(Icons.EMPTY_TRASH); fontSize(80f) } }
+                        Image { attr { src(Icons.EMPTY_TRASH); width(80f); height(80f) } }
                         Text { attr { text("回收站为空"); fontSize(ThemeStyles.fontSizeSubtitle); color(ThemeColors.textLight); marginTop(12f) } }
                         Text { attr { text("已删除的笔记将显示在这里"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textPlaceholder); marginTop(8f) } }
                     }
                 } else {
                     for (note in ctx.deletedNotes) {
+                        val isSelected = ctx.selectedNoteIds.contains(note.id)
                         View {
                             attr {
-                                flexDirectionRow(); justifyContentSpaceBetween(); alignItemsCenter()
+                                flexDirectionRow(); alignItemsCenter()
                                 backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
                                 padding(top = 12f, left = 16f, bottom = 12f, right = 16f); marginBottom(8f)
                             }
-                            View {
-                                attr { flex(1f); flexDirectionColumn() }
-                                Text {
-                                    attr { text(note.title.ifBlank { "无标题笔记" }); fontSize(ThemeStyles.fontSizeBody)
-                                        fontWeightBold(); color(ThemeColors.textPrimary) } }
+                            if (ctx.isMultiSelectMode) {
+                                View {
+                                    attr { padding(right = 10f) }
+                                    event { click { ctx.toggleNoteSelection(note.id) } }
+                                    Image { attr { src(if (isSelected) Icons.SELECTED else Icons.SELECT_ALL); width(22f); height(22f) } }
+                                }
+                                View {
+                                    attr { flex(1f); flexDirectionColumn() }
+                                    event { click { ctx.toggleNoteSelection(note.id) } }
+                                    Text {
+                                        attr { text(note.title.ifBlank { "无标题笔记" }); fontSize(ThemeStyles.fontSizeBody)
+                                            fontWeightBold(); color(ThemeColors.textPrimary) } }
+                                    Text {
+                                        attr { text("删除于 ${note.deletedAt?.let { formatDateTimeOnly(it) } ?: ""}")
+                                            fontSize(ThemeStyles.fontSizeSmall); color(ThemeColors.textLight); marginTop(4f) } }
+                                }
+                            } else {
+                                View {
+                                    attr { flex(1f); flexDirectionColumn() }
+                                    Text {
+                                        attr { text(note.title.ifBlank { "无标题笔记" }); fontSize(ThemeStyles.fontSizeBody)
+                                            fontWeightBold(); color(ThemeColors.textPrimary) } }
                                 Text {
                                     attr { text("删除于 ${note.deletedAt?.let { formatDateTimeOnly(it) } ?: ""}")
                                         fontSize(ThemeStyles.fontSizeSmall); color(ThemeColors.textLight); marginTop(4f) } }
+                                }
+                                View {
+                                    attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                                        backgroundColor(ThemeColors.successLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
+                                    event { click { AppRepo.repo.restoreNote(note.id); ctx.loadDeletedNotes(); ctx.showToast("已恢复「${note.title.ifBlank { "无标题笔记" }}」") } }
+                                    View {
+                                        attr { flexDirectionRow(); alignItemsCenter() }
+                                        Image { attr { src(Icons.RESTORE); width(14f); height(14f); marginRight(4f) } }
+                                        Text { attr { text("恢复"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.success) } }
+                                    }
+                                }
+                                View {
+                                    attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                                        backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
+                                    event { click { ctx.showConfirm("永久删除", "确定要永久删除「${note.title.ifBlank { "无标题笔记" }}」吗？此操作不可恢复。") { AppRepo.repo.permanentlyDeleteNote(note.id); ctx.loadDeletedNotes(); ctx.showToast("已永久删除") } } }
+                                    View {
+                                        attr { flexDirectionRow(); alignItemsCenter() }
+                                        Image { attr { src(Icons.DELETE); width(14f); height(14f); marginRight(4f) } }
+                                        Text { attr { text("删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
+                                    }
+                                }
                             }
+                        }
+                    }
+                }
+            }
+
+            // ========== 批量操作工具栏 ==========
+            if (ctx.isMultiSelectMode && ctx.selectedNoteIds.isNotEmpty()) {
+                View {
+                    attr { flexDirectionRow(); alignItemsCenter(); justifyContentSpaceBetween()
+                        padding(top = 8f, left = 16f, bottom = 8f, right = 16f)
+                        backgroundColor(ThemeColors.surface) }
+                    View { attr { flexDirectionRow(); alignItemsCenter() }
+                        View {
+                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.successLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
+                            event { click { ctx.batchRestore() } }
                             View {
-                                attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
-                                    backgroundColor(ThemeColors.successLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
-                                event { click { AppRepo.repo.restoreNote(note.id); ctx.loadDeletedNotes(); ctx.showToast("已恢复「${note.title.ifBlank { "无标题笔记" }}」") } }
-                                Text { attr { text("${Icons.RESTORE} 恢复"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.success) } }
+                                attr { flexDirectionRow(); alignItemsCenter() }
+                                Image { attr { src(Icons.RESTORE); width(14f); height(14f); marginRight(4f) } }
+                                Text { attr { text("恢复"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.success) } }
                             }
+                        }
+                        View {
+                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
+                            event { click { ctx.batchDeletePermanently() } }
                             View {
-                                attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
-                                    backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
-                                event { click { ctx.showConfirm("永久删除", "确定要永久删除「${note.title.ifBlank { "无标题笔记" }}」吗？此操作不可恢复。") { AppRepo.repo.permanentlyDeleteNote(note.id); ctx.loadDeletedNotes(); ctx.showToast("已永久删除") } } }
-                                Text { attr { text("${Icons.DELETE} 删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
+                                attr { flexDirectionRow(); alignItemsCenter() }
+                                Image { attr { src(Icons.DELETE); width(14f); height(14f); marginRight(4f) } }
+                                Text { attr { text("删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
                             }
                         }
                     }

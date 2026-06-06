@@ -9,6 +9,7 @@ import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
 import com.tencent.kuikly.core.views.View
 import com.tencent.kuikly.core.views.Text
+import com.tencent.kuikly.core.views.Image
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Input
 import com.tencent.kuikly.core.views.TextArea
@@ -25,7 +26,7 @@ import com.noteapp.theme.Icons
 import com.noteapp.util.Sanitizer
 import com.noteapp.util.UUID
 import com.noteapp.util.currentTimeString
-import com.noteapp.util.formatTimeOnly
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import com.tencent.kuikly.core.timer.setTimeout
@@ -40,7 +41,7 @@ internal class NoteEditPage : Pager() {
     private var createdAt by observable("")
     private var noteTags by observableList<Tag>()
     private var allTags by observableList<Tag>()
-    private var saveStatus by observable("已保存")
+    private var saveStatus by observable(SaveState.SAVED)
     private var showPreview by observable(true)
     private var showExportMenu by observable(false)
     private var showTagPicker by observable(false)
@@ -56,21 +57,34 @@ internal class NoteEditPage : Pager() {
     private var showToast by observable(false)
     private var toastTimerRef: String? = null
 
+    // Markdown preview debounce
+    private var previewContent by observable("")
+    private var previewDebounceRef: String? = null
+
     // Confirmation dialog
     private var showConfirmDialog by observable(false)
     private var confirmTitle by observable("")
     private var confirmMessage by observable("")
     private var confirmAction by observable<(() -> Unit)?>(null)
 
-    // Loading state
-    private var isLoading by observable(false)
-
     override fun created() {
         super.created()
         noteId = pagerData.params.optString("noteId", "")
-        loadNote()
+        if (noteId.isBlank()) {
+            noteId = UUID.generate()
+            createdAt = currentTimeString()
+            isDraft = true
+            saveStatus = SaveState.UNSAVED
+        } else {
+            loadNote()
+            saveStatus = SaveState.SAVED
+        }
         loadTags()
         tryRestoreDraft()
+        if (isDraft) {
+            saveStatus = SaveState.UNSAVED
+        }
+        previewContent = content
     }
 
     override fun pageDidAppear() {
@@ -88,10 +102,14 @@ internal class NoteEditPage : Pager() {
         super.pageWillDestroy()
         cancelAutoSave()
         saveDraft()
+        toastTimerRef?.let { clearTimeout(it) }
+        toastTimerRef = null
+        previewDebounceRef?.let { clearTimeout(it) }
+        previewDebounceRef = null
     }
 
     private fun loadNote() {
-        val note = AppRepo.repo.getNoteById(noteId) ?: return
+        val note = AppRepo.repo.getActiveNoteById(noteId) ?: return
         title = note.title.ifBlank { "无标题笔记" }
         content = note.content
         createdAt = note.createdAt
@@ -125,7 +143,7 @@ internal class NoteEditPage : Pager() {
     }
 
     private fun saveDraft() {
-        if (noteId.isBlank()) return
+        if (noteId.isBlank() || !hasUnsavedChanges) return
         val draftKey = "draft_$noteId"
         val draftNote = Note(
             id = noteId, title = title, content = content,
@@ -143,7 +161,6 @@ internal class NoteEditPage : Pager() {
         autoSaveTimerRef = setTimeout(ThemeStyles.autoSaveInterval.toInt()) {
             if (hasUnsavedChanges) {
                 doSave()
-                saveDraft()
                 hasUnsavedChanges = false
             }
             startAutoSave()
@@ -160,18 +177,19 @@ internal class NoteEditPage : Pager() {
     }
 
     private fun doSave() {
+        val existing = AppRepo.repo.getNoteById(noteId)
         val note = Note(
             id = noteId, title = title, content = content,
             createdAt = if (createdAt.isBlank()) currentTimeString() else createdAt,
-            updatedAt = currentTimeString()
+            updatedAt = currentTimeString(),
+            deletedAt = existing?.deletedAt
         )
-        val existing = AppRepo.repo.getNoteById(noteId)
         if (existing != null) {
             AppRepo.repo.updateNote(note)
         } else {
             AppRepo.repo.insertNote(note)
         }
-        saveStatus = "已保存 ${formatTimeOnly(currentTimeString())}"
+        saveStatus = SaveState.SAVED
         isDraft = false
         // Clear draft after successful save
         savePersistentData("draft_$noteId", "")
@@ -194,7 +212,7 @@ internal class NoteEditPage : Pager() {
     }
 
     private fun doExportFormat(format: String) {
-        val safeTitle = title.ifBlank { "无标题笔记" }
+        val safeTitle = sanitizeFileName(title.ifBlank { "无标题笔记" })
         when (format) {
             "Markdown (.md)" -> exportFile("${safeTitle}.md", "# $title\n\n$content", "text/markdown")
             "纯文本 (.txt)" -> exportFile("${safeTitle}.txt", "$title\n\n$content", "text/plain")
@@ -212,13 +230,15 @@ internal class NoteEditPage : Pager() {
     private fun doTitleChange(newTitle: String) {
         title = newTitle
         markChanged()
-        doSave()
     }
 
     private fun doContentChange(newContent: String) {
         content = newContent
         markChanged()
-        doSave()
+        previewDebounceRef?.let { clearTimeout(it) }
+        previewDebounceRef = setTimeout(400) {
+            previewContent = content
+        }
     }
 
     private fun showToast(message: String) {
@@ -245,6 +265,83 @@ internal class NoteEditPage : Pager() {
         confirmAction = null
     }
 
+    private fun sanitizeFileName(name: String): String {
+        val invalidChars = Regex("[/\\\\:*?\"<>|\r\n]")
+        var sanitized = invalidChars.replace(name, "_")
+        if (sanitized.length > 80) {
+            sanitized = sanitized.substring(0, 80)
+        }
+        return sanitized
+    }
+
+    // ========== Markdown 预览内联格式解析 ==========
+
+    private enum class SaveState { UNSAVED, SAVED, SAVING }
+
+    private enum class SpanStyle { NORMAL, BOLD, ITALIC, CODE }
+
+    /**
+     * 解析单行 Markdown 内联格式，返回文本片段列表
+     * 支持 **粗体**、*斜体*、`` `代码` ``
+     */
+    private fun parseInlineMarkdown(line: String): List<Pair<String, SpanStyle>> {
+        val result = mutableListOf<Pair<String, SpanStyle>>()
+        var i = 0
+        while (i < line.length) {
+            when {
+                // 粗体 **text**
+                line.startsWith("**", i) -> {
+                    val end = line.indexOf("**", i + 2)
+                    if (end > 0) {
+                        result.add(line.substring(i + 2, end) to SpanStyle.BOLD)
+                        i = end + 2
+                    } else {
+                        result.add(line.substring(i) to SpanStyle.NORMAL)
+                        break
+                    }
+                }
+                // 斜体 *text*（排除 ** 情况）
+                line[i] == '*' -> {
+                    val end = line.indexOf('*', i + 1)
+                    if (end > 0 && end - i > 1) {
+                        result.add(line.substring(i + 1, end) to SpanStyle.ITALIC)
+                        i = end + 1
+                    } else {
+                        result.add(line.substring(i) to SpanStyle.NORMAL)
+                        break
+                    }
+                }
+                // 代码 `text`
+                line[i] == '`' -> {
+                    val end = line.indexOf('`', i + 1)
+                    if (end > 0) {
+                        result.add(line.substring(i + 1, end) to SpanStyle.CODE)
+                        i = end + 1
+                    } else {
+                        result.add(line.substring(i) to SpanStyle.NORMAL)
+                        break
+                    }
+                }
+                // 普通文本，收集到下一个标记前
+                else -> {
+                    val nextBold = line.indexOf("**", i).takeIf { it >= 0 } ?: Int.MAX_VALUE
+                    val nextItalic = line.indexOf('*', i).takeIf { it >= 0 } ?: Int.MAX_VALUE
+                    val nextCode = line.indexOf('`', i).takeIf { it >= 0 } ?: Int.MAX_VALUE
+                    val end = minOf(nextBold, nextItalic, nextCode)
+                    if (end == Int.MAX_VALUE) {
+                        result.add(line.substring(i) to SpanStyle.NORMAL)
+                        break
+                    } else {
+                        result.add(line.substring(i, end) to SpanStyle.NORMAL)
+                        i = end
+                    }
+                }
+            }
+        }
+        if (result.isEmpty()) result.add(line to SpanStyle.NORMAL)
+        return result
+    }
+
     override fun body(): ViewBuilder {
         val ctx = this
         return {
@@ -261,14 +358,24 @@ internal class NoteEditPage : Pager() {
                 View {
                     attr { padding(right = 16f) }
                     event { click { ctx.doSaveAndClose() } }
-                    Text { attr { text("${Icons.BACK} 返回"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.primary) } }
+                    View {
+                        attr { flexDirectionRow(); alignItemsCenter() }
+                        Image { attr { src(Icons.BACK); width(16f); height(16f); marginRight(4f) } }
+                        Text { attr { text("返回"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.primary) } }
+                    }
                 }
 
                 View { attr { flexDirectionRow(); alignItemsCenter() }
-                    if (ctx.isDraft) {
-                        Text { attr { text("草稿"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.warning); marginRight(6f) } }
+                    val statusText = when (ctx.saveStatus) {
+                        SaveState.UNSAVED -> "未保存"
+                        SaveState.SAVED -> "已保存"
+                        SaveState.SAVING -> "保存中..."
                     }
-                    Text { attr { text(ctx.saveStatus); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textHint) } }
+                    val statusColor = when (ctx.saveStatus) {
+                        SaveState.UNSAVED -> ThemeColors.warning
+                        else -> ThemeColors.textHint
+                    }
+                    Text { attr { text(statusText); fontSize(ThemeStyles.fontSizeCaption); color(statusColor) } }
                 }
 
                 View { attr { flexDirectionRow(); alignItemsCenter() }
@@ -276,26 +383,41 @@ internal class NoteEditPage : Pager() {
                         attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
                             backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                         event { click { ctx.showTagPicker = true; ctx.loadTags() } }
-                        Text { attr { text("${Icons.TAG} 标签"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        View {
+                            attr { flexDirectionRow(); alignItemsCenter() }
+                            Image { attr { src(Icons.TAG); width(14f); height(14f); marginRight(4f) } }
+                            Text { attr { text("标签"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        }
                     }
                     View {
                         attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
                             backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                         event { click { ctx.showPreview = !ctx.showPreview } }
-                        Text { attr { text("${Icons.PREVIEW} ${if (ctx.showPreview) "隐藏预览" else "显示预览"}")
-                            fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        View {
+                            attr { flexDirectionRow(); alignItemsCenter() }
+                            Image { attr { src(Icons.PREVIEW); width(14f); height(14f); marginRight(4f) } }
+                            Text { attr { text(if (ctx.showPreview) "隐藏预览" else "显示预览"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        }
                     }
                     View {
                         attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
                             backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                         event { click { ctx.showExportMenu = true } }
-                        Text { attr { text("${Icons.EXPORT} 导出"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        View {
+                            attr { flexDirectionRow(); alignItemsCenter() }
+                            Image { attr { src(Icons.EXPORT); width(14f); height(14f); marginRight(4f) } }
+                            Text { attr { text("导出"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                        }
                     }
                     View {
                         attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
                             backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
                         event { click { ctx.doDelete() } }
-                        Text { attr { text("${Icons.DELETE} 删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
+                        View {
+                            attr { flexDirectionRow(); alignItemsCenter() }
+                            Image { attr { src(Icons.DELETE); width(14f); height(14f); marginRight(4f) } }
+                            Text { attr { text("删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
+                        }
                     }
                 }
             }
@@ -318,7 +440,7 @@ internal class NoteEditPage : Pager() {
 
                     TextArea {
                         attr {
-                            flex(1f); text(ctx.content); fontSize(ThemeStyles.fontSizeBody); color(Color(0xFF444444L))
+                            flex(1f); text(ctx.content); fontSize(ThemeStyles.fontSizeBody);                             color(ThemeColors.textSecondary)
                             placeholder("开始写笔记... 支持 Markdown 语法\n\n# 一级标题\n## 二级标题\n- 列表项\n**粗体** *斜体*")
                             placeholderColor(ThemeColors.textPlaceholder)
                         }
@@ -334,7 +456,7 @@ internal class NoteEditPage : Pager() {
                         Text { attr { text("预览"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textLight); marginBottom(8f) } }
                         List {
                             attr { flex(1f) }
-                            val safeContent = Sanitizer.stripHtml(ctx.content)
+                            val safeContent = Sanitizer.stripHtml(ctx.previewContent)
                             val lines = safeContent.split("\n")
                             for (line in lines) {
                                 when {
@@ -343,7 +465,7 @@ internal class NoteEditPage : Pager() {
                                             marginTop(16f); marginBottom(8f); color(ThemeColors.textPrimary) } }
                                     line.startsWith("## ") -> Text {
                                         attr { text(line.removePrefix("## ")); fontSize(24f); fontWeightBold()
-                                            marginTop(12f); marginBottom(6f); color(Color(0xFF444444L)) } }
+                                            marginTop(12f); marginBottom(6f); color(ThemeColors.textSecondary) } }
                                     line.startsWith("### ") -> Text {
                                         attr { text(line.removePrefix("### ")); fontSize(20f); fontWeightBold()
                                             marginTop(10f); marginBottom(4f); color(ThemeColors.textSecondary) } }
@@ -352,10 +474,32 @@ internal class NoteEditPage : Pager() {
                                             fontSize(ThemeStyles.fontSizeBody); marginBottom(4f); color(ThemeColors.textSecondary) } }
                                     line.startsWith("> ") -> Text {
                                         attr { text(line.removePrefix("> ")); fontSize(ThemeStyles.fontSizeBody)
-                                            color(Color(0xFF888888L)); marginBottom(4f) } }
+                                            color(ThemeColors.textHint); marginBottom(4f) } }
                                     line.isBlank() -> View { attr { height(12f) } }
-                                    else -> Text {
-                                        attr { text(line); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textSecondary); marginBottom(4f) } }
+                                    else -> {
+                                        val spans = ctx.parseInlineMarkdown(line)
+                                        View {
+                                            attr { flexDirectionRow(); flexWrapWrap(); marginBottom(4f) }
+                                            for ((text, style) in spans) {
+                                                when (style) {
+                                                    SpanStyle.BOLD -> Text {
+                                                        attr { text(text); fontSize(ThemeStyles.fontSizeBody)
+                                                            fontWeightBold(); color(ThemeColors.textPrimary) } }
+                                                    SpanStyle.ITALIC -> Text {
+                                                        attr { text(text); fontSize(ThemeStyles.fontSizeBody)
+                                                            color(ThemeColors.textTertiary) } }
+                                                    SpanStyle.CODE -> View {
+                                                        attr { backgroundColor(ThemeColors.chipBg); borderRadius(4f)
+                                                            padding(top = 2f, left = 4f, bottom = 2f, right = 4f); marginLeft(2f); marginRight(2f) }
+                                                        Text { attr { text(text); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.danger) } }
+                                                    }
+                                                    SpanStyle.NORMAL -> Text {
+                                                        attr { text(text); fontSize(ThemeStyles.fontSizeBody)
+                                                            color(ThemeColors.textSecondary) } }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -377,7 +521,7 @@ internal class NoteEditPage : Pager() {
                             View {
                                 attr { padding(top = 2f, left = 2f, bottom = 2f, right = 2f) }
                                 event { click { AppRepo.repo.removeTagFromNote(ctx.noteId, tag.id); ctx.loadNote(); ctx.loadTags() } }
-                                Text { attr { text(Icons.CLOSE); fontSize(ThemeStyles.fontSizeSmall); color(ThemeColors.textHint) } }
+                                Image { attr { src(Icons.CLOSE); width(14f); height(14f) } }
                             }
                         }
                     }
@@ -458,7 +602,7 @@ internal class NoteEditPage : Pager() {
                             attr { padding(top = 12f, bottom = 12f); flexDirectionRow(); alignItemsCenter() }
                             event { click { ctx.doExportFormat(format) } }
                             Text { attr { text(format); fontSize(ThemeStyles.fontSizeBody); flex(1f); color(ThemeColors.textPrimary) } }
-                            Text { attr { text(Icons.FORWARD); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textPlaceholder) } }
+                            Image { attr { src(Icons.FORWARD); width(18f); height(18f) } }
                         } }
                         View { attr { marginTop(16f); alignSelfStretch(); padding(top = 10f, bottom = 10f)
                             backgroundColor(ThemeColors.border); borderRadius(ThemeStyles.borderRadiusButton); alignItemsCenter() }
@@ -486,7 +630,6 @@ internal class NoteEditPage : Pager() {
                     attr { width(pagerData.pageViewWidth); height(pagerData.pageViewHeight)
                         positionAbsolute(); top(0f); left(0f); backgroundColor(ThemeColors.overlay)
                         justifyContentCenter(); alignItemsCenter() }
-                    event { click { ctx.dismissConfirmDialog() } }
                     View {
                         attr { width(300f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
                             padding(top = 24f, left = 24f, bottom = 24f, right = 24f) }

@@ -9,6 +9,7 @@ import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
 import com.tencent.kuikly.core.views.View
 import com.tencent.kuikly.core.views.Text
+import com.tencent.kuikly.core.views.Image
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Input
 import com.tencent.kuikly.core.module.RouterModule
@@ -22,8 +23,13 @@ import com.noteapp.theme.Icons
 import com.noteapp.util.UUID
 import com.noteapp.util.currentTimeString
 import com.noteapp.util.formatDateTimeOnly
+import com.noteapp.data.savePersistentData
+import com.noteapp.data.loadPersistentData
 import com.tencent.kuikly.core.timer.setTimeout
 import com.tencent.kuikly.core.timer.clearTimeout
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Page("NoteListPage")
 internal class NoteListPage : Pager() {
@@ -42,15 +48,28 @@ internal class NoteListPage : Pager() {
     private var searchScope by observable(NoteRepository.SearchScope.TITLE_AND_CONTENT)
     private var showSearchHistory by observable(false)
     private var showSearchScopePicker by observable(false)
+    private val searchHistoryKey = "search_history"
+    private val sortByKey = "sort_by"
+    private val filterTagIdKey = "filter_tag_id"
+    private val filterTagNameKey = "filter_tag_name"
+
+    // Sort
+    private var sortBy by observable(SortBy.UPDATED_TIME)
+    private var showSortPicker by observable(false)
 
     // Batch operations
     private var isMultiSelectMode by observable(false)
     private var selectedNoteIds by observableList<String>()
 
+    // New tag in sidebar
+    private var newTagName by observable("")
+    private var showNewTagInput by observable(false)
+
     // Toast
     private var toastMessage by observable("")
     private var showToast by observable(false)
     private var toastTimerRef: String? = null
+    private var searchDebounceRef: String? = null
 
     // Confirmation dialog
     private var showConfirmDialog by observable(false)
@@ -64,7 +83,57 @@ internal class NoteListPage : Pager() {
 
     override fun created() {
         super.created()
+        loadSearchHistory()
+        loadPersistentSortAndFilter()
         loadData()
+    }
+
+    private fun loadPersistentSortAndFilter() {
+        val savedSort = loadPersistentData(sortByKey)
+        if (savedSort.isNotBlank()) {
+            try {
+                val ordinal = savedSort.toInt()
+                sortBy = SortBy.entries.getOrElse(ordinal) { SortBy.UPDATED_TIME }
+            } catch (_: Exception) { }
+        }
+        val savedTagId = loadPersistentData(filterTagIdKey)
+        if (savedTagId.isNotBlank()) {
+            filterTagId = savedTagId
+            filterTagName = loadPersistentData(filterTagNameKey).ifBlank { "全部笔记" }
+        }
+    }
+
+    private fun persistSortBy() {
+        savePersistentData(sortByKey, sortBy.ordinal.toString())
+    }
+
+    private fun persistFilterTag() {
+        filterTagId?.let { savePersistentData(filterTagIdKey, it) } ?: savePersistentData(filterTagIdKey, "")
+        savePersistentData(filterTagNameKey, filterTagName)
+    }
+
+    private fun loadSearchHistory() {
+        val saved = loadPersistentData(searchHistoryKey)
+        if (saved.isNotEmpty() && saved != "{}") {
+            try {
+                val list = Json.decodeFromString<List<String>>(saved)
+                searchHistory.clear(); searchHistory.addAll(list)
+            } catch (_: Exception) { }
+        }
+    }
+
+    private fun persistSearchHistory() {
+        try {
+            savePersistentData(searchHistoryKey, Json.encodeToString(searchHistory.toList()))
+        } catch (_: Exception) { }
+    }
+
+    override fun pageWillDestroy() {
+        super.pageWillDestroy()
+        toastTimerRef?.let { clearTimeout(it) }
+        toastTimerRef = null
+        searchDebounceRef?.let { clearTimeout(it) }
+        searchDebounceRef = null
     }
 
     override fun pageDidAppear() {
@@ -88,30 +157,47 @@ internal class NoteListPage : Pager() {
 
     private fun refreshNotes() {
         val repo = AppRepo.repo
-        var result: List<Note> = when {
-            filterTagId != null -> repo.getNotesForTag(filterTagId!!)
-            searchQuery.isNotBlank() -> repo.searchNotes(searchQuery, searchScope)
-            else -> repo.getAllNotes()
+        var result = repo.getAllNotes()
+        filterTagId?.let {
+            val tagNoteIds = repo.getNotesForTag(it).map { n -> n.id }.toSet()
+            result = result.filter { note -> note.id in tagNoteIds }
         }
-        result = result.sortedByDescending { it.updatedAt }
+        if (searchQuery.isNotBlank()) {
+            result = repo.searchNotes(searchQuery, searchScope).filter { note -> result.any { it.id == note.id } }
+        }
+        result = when (sortBy) {
+            SortBy.UPDATED_TIME -> result.sortedByDescending { it.updatedAt }
+            SortBy.CREATED_TIME -> result.sortedByDescending { it.createdAt }
+            SortBy.TITLE -> result.sortedBy { it.title.lowercase() }
+        }
         notes.clear(); notes.addAll(result)
     }
 
-    private fun performSearch(query: String) {
+    private fun performSearch(query: String, saveHistory: Boolean = false) {
         searchQuery = query
-        if (query.isNotBlank()) {
+        if (saveHistory && query.isNotBlank()) {
             searchHistory.removeAll { it == query }
             searchHistory.add(0, query)
             if (searchHistory.size > 10) {
                 searchHistory.removeAt(searchHistory.lastIndex)
             }
+            persistSearchHistory()
         }
         showSearchHistory = false
         refreshNotes()
     }
 
+    private fun debouncedSearch(query: String) {
+        searchDebounceRef?.let { clearTimeout(it) }
+        searchDebounceRef = setTimeout(300) {
+            performSearch(query, saveHistory = false)
+            searchDebounceRef = null
+        }
+    }
+
     private fun clearSearchHistory() {
         searchHistory.clear()
+        persistSearchHistory()
     }
 
     private fun toggleMultiSelectMode() {
@@ -153,9 +239,7 @@ internal class NoteListPage : Pager() {
 
     private fun doBatchDeleteConfirmed() {
         val ids = selectedNoteIds.toList()
-        for (id in ids) {
-            AppRepo.repo.softDeleteNote(id, currentTimeString())
-        }
+        AppRepo.repo.softDeleteNotes(ids, currentTimeString())
         selectedNoteIds.clear()
         isMultiSelectMode = false
         refreshNotes()
@@ -168,9 +252,7 @@ internal class NoteListPage : Pager() {
 
     private fun doBatchTag(tagId: String) {
         val ids = selectedNoteIds.toList()
-        for (id in ids) {
-            AppRepo.repo.addTagToNote(id, tagId)
-        }
+        AppRepo.repo.addTagToNotes(ids, tagId)
         showBatchTagPicker = false
         selectedNoteIds.clear()
         isMultiSelectMode = false
@@ -250,7 +332,7 @@ internal class NoteListPage : Pager() {
                 View {
                     attr { padding(right = 12f) }
                     event { click { ctx.showSidebar = !ctx.showSidebar } }
-                    Text { attr { text(if (ctx.showSidebar) Icons.CLOSE else Icons.MENU); fontSize(22f); color(ThemeColors.textPrimary) } }
+                    Image { attr { src(if (ctx.showSidebar) Icons.CLOSE else Icons.MENU); width(22f); height(22f) } }
                 }
 
                 if (ctx.isMultiSelectMode) {
@@ -282,7 +364,7 @@ internal class NoteListPage : Pager() {
                                 placeholder("搜索笔记..."); placeholderColor(ThemeColors.textHint)
                                 color(ThemeColors.textPrimary)
                             }
-                            event { textDidChange { ctx.performSearch(it.text) } }
+                            event { textDidChange { ctx.debouncedSearch(it.text) } }
                         }
                     }
 
@@ -290,22 +372,6 @@ internal class NoteListPage : Pager() {
                         attr { padding(top = 4f, left = 4f, bottom = 4f, right = 4f); marginLeft(4f) }
                         event { click { ctx.showSearchScopePicker = !ctx.showSearchScopePicker; ctx.showSearchHistory = false } }
                         Text { attr { text(ctx.searchScope.displayName()); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
-                    }
-
-                    View {
-                        attr {
-                            padding(top = 8f, left = 12f, bottom = 8f, right = 12f)
-                            backgroundColor(ThemeColors.primary); borderRadius(ThemeStyles.borderRadiusButton); marginLeft(8f)
-                        }
-                        event {
-                            click {
-                                val note = Note(id = UUID.generate(), title = "无标题笔记", content = "",
-                                    createdAt = currentTimeString(), updatedAt = currentTimeString())
-                                AppRepo.repo.insertNote(note)
-                                ctx.openNoteEditor(note.id)
-                            }
-                        }
-                        Text { attr { text("${Icons.ADD} 新建"); fontSize(ThemeStyles.fontSizeBody); color(Color.WHITE) } }
                     }
                 }
             }
@@ -320,7 +386,7 @@ internal class NoteListPage : Pager() {
                             event { click { ctx.searchScope = scope; ctx.showSearchScopePicker = false; ctx.refreshNotes() } }
                             Text { attr { text(scope.displayName()); fontSize(ThemeStyles.fontSizeBody); color(if (ctx.searchScope == scope) ThemeColors.primary else ThemeColors.textPrimary); marginRight(8f) } }
                             if (ctx.searchScope == scope) {
-                                Text { attr { text(Icons.CHECK); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.primary) } }
+                                Image { attr { src(Icons.CHECK); width(16f); height(16f) } }
                             }
                         }
                     }
@@ -343,9 +409,9 @@ internal class NoteListPage : Pager() {
                     for (query in ctx.searchHistory) {
                         View {
                             attr { padding(top = 8f, left = 16f, bottom = 8f, right = 16f); flexDirectionRow(); alignItemsCenter() }
-                            event { click { ctx.performSearch(query) } }
+                            event { click { ctx.performSearch(query, saveHistory = true) } }
                             Text { attr { text(query); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textPrimary); flex(1f) } }
-                            Text { attr { text(Icons.HISTORY); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textLight) } }
+                            Image { attr { src(Icons.HISTORY); width(16f); height(16f) } }
                         }
                     }
                 }
@@ -388,7 +454,7 @@ internal class NoteListPage : Pager() {
                         View {
                             attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f)
                                 backgroundColor(if (ctx.filterTagId == null) ThemeColors.primaryLight else ThemeColors.transparent) }
-                            event { click { ctx.filterTagId = null; ctx.filterTagName = "全部笔记"; ctx.refreshNotes() } }
+                            event { click { ctx.filterTagId = null; ctx.filterTagName = "全部笔记"; ctx.persistFilterTag(); ctx.refreshNotes() } }
                             Text { attr { text("全部笔记 (${AppRepo.repo.activeNoteCount()})"); fontSize(ThemeStyles.fontSizeBody)
                                 color(if (ctx.filterTagId == null) ThemeColors.primary else ThemeColors.textPrimary) } }
                         }
@@ -397,7 +463,7 @@ internal class NoteListPage : Pager() {
                             View {
                                 attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f)
                                     backgroundColor(if (ctx.filterTagId == tag.id) ThemeColors.primaryLight else ThemeColors.transparent) }
-                                event { click { ctx.filterTagId = tag.id; ctx.filterTagName = tag.name; ctx.refreshNotes() } }
+                                event { click { ctx.filterTagId = tag.id; ctx.filterTagName = tag.name; ctx.persistFilterTag(); ctx.refreshNotes() } }
                                 Text { attr { text("${tag.name} (${AppRepo.repo.getNotesForTag(tag.id).size})"); fontSize(ThemeStyles.fontSizeBody)
                                     color(if (ctx.filterTagId == tag.id) ThemeColors.primary else ThemeColors.textPrimary) } }
                             }
@@ -408,7 +474,11 @@ internal class NoteListPage : Pager() {
                         View {
                             attr { padding(top = 12f, left = 16f, bottom = 12f, right = 16f); flexDirectionRow(); alignItemsCenter() }
                             event { click { ctx.acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("RecycleBinPage", com.tencent.kuikly.core.nvi.serialization.json.JSONObject()) } }
-                            Text { attr { text("${Icons.EMPTY_TRASH} 回收站"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textTertiary) } }
+                            View {
+                                attr { flexDirectionRow(); alignItemsCenter() }
+                                Image { attr { src(Icons.EMPTY_TRASH); width(16f); height(16f); marginRight(4f) } }
+                                Text { attr { text("回收站"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textTertiary) } }
+                            }
                         }
                     }
                 } // end sidebar
@@ -417,17 +487,48 @@ internal class NoteListPage : Pager() {
                 View {
                     attr { flex(1f); flexDirectionColumn() }
 
+                    // 侧边栏遮罩层
+                    if (ctx.showSidebar) {
+                        View {
+                            attr { positionAbsolute(); top(0f); left(0f); right(0f); bottom(0f)
+                                backgroundColor(ThemeColors.overlay); zIndex(50) }
+                            event { click { ctx.showSidebar = false } }
+                        }
+                    }
+
                     View {
                         attr { padding(top = 16f, left = 16f, bottom = 8f, right = 16f)
                             flexDirectionRow(); justifyContentSpaceBetween(); alignItemsCenter() }
                         Text { attr { text(ctx.filterTagName); fontSize(ThemeStyles.fontSizeTitle); fontWeightBold(); color(ThemeColors.textPrimary) } }
                         View { attr { flexDirectionRow(); alignItemsCenter() }
                             Text { attr { text("共 ${ctx.notes.size} 篇"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textHint); marginRight(12f) } }
+                            View {
+                                attr { padding(top = 4f, left = 8f, bottom = 4f, right = 8f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
+                                event { click { ctx.showSortPicker = !ctx.showSortPicker } }
+                                Text { attr { text(ctx.sortBy.displayName); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                            }
                             if (!ctx.isMultiSelectMode && ctx.notes.isNotEmpty()) {
                                 View {
                                     attr { padding(top = 4f, left = 8f, bottom = 4f, right = 8f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip) }
                                     event { click { ctx.toggleMultiSelectMode() } }
-                                    Text { attr { text(Icons.SELECT_ALL); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textTertiary) } }
+                                    Image { attr { src(Icons.SELECT_ALL); width(18f); height(18f) } }
+                                }
+                            }
+                        }
+                    }
+
+                    // ========== 排序选择器浮层 ==========
+                    if (ctx.showSortPicker) {
+                        View {
+                            attr { positionAbsolute(); top(52f); right(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 4f, bottom = 4f); zIndex(100) }
+                            for (sort in SortBy.entries) {
+                                View {
+                                    attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f); flexDirectionRow(); alignItemsCenter() }
+                                    event { click { ctx.sortBy = sort; ctx.persistSortBy(); ctx.showSortPicker = false; ctx.refreshNotes() } }
+                                    Text { attr { text(sort.displayName); fontSize(ThemeStyles.fontSizeBody); color(if (ctx.sortBy == sort) ThemeColors.primary else ThemeColors.textPrimary); marginRight(8f) } }
+                                    if (ctx.sortBy == sort) {
+                                        Image { attr { src(Icons.CHECK); width(16f); height(16f) } }
+                                    }
                                 }
                             }
                         }
@@ -438,9 +539,13 @@ internal class NoteListPage : Pager() {
                         if (ctx.notes.isEmpty()) {
                             View {
                                 attr { flex(1f); alignItemsCenter(); justifyContentCenter(); paddingTop(80f) }
-                                Text { attr { text(Icons.NOTE_EMPTY); fontSize(64f) } }
-                                Text { attr { text(if (ctx.searchQuery.isNotBlank()) "未找到相关笔记" else "暂无笔记，点击右上角创建")
-                                    fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textLight); marginTop(12f) } }
+                                View {
+                                    attr { width(96f); height(96f); borderRadius(48f)
+                                        backgroundColor(ThemeColors.chipBg); justifyContentCenter(); alignItemsCenter() }
+                                    Image { attr { src(Icons.NOTE_EMPTY); width(64f); height(64f) } }
+                                }
+                                Text { attr { text(if (ctx.searchQuery.isNotBlank()) "未找到相关笔记" else "暂无笔记，点击右下角创建")
+                                    fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textLight); marginTop(16f); lineHeight(22f) } }
                             }
                         } else {
                             val tagsMap = AppRepo.repo.getTagsForNotes(ctx.notes.map { it.id })
@@ -456,7 +561,7 @@ internal class NoteListPage : Pager() {
                                         View {
                                             attr { padding(right = 10f) }
                                             event { click { ctx.toggleNoteSelection(note.id) } }
-                                            Text { attr { text(if (isSelected) Icons.SELECTED else Icons.SELECT_ALL); fontSize(22f); color(if (isSelected) ThemeColors.primary else ThemeColors.textHint) } }
+                                            Image { attr { src(if (isSelected) Icons.SELECTED else Icons.SELECT_ALL); width(22f); height(22f) } }
                                         }
                                     }
                                     View {
@@ -521,17 +626,29 @@ internal class NoteListPage : Pager() {
                         View {
                             attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                             event { click { ctx.batchDelete() } }
-                            Text { attr { text("${Icons.DELETE} 删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
+                            View {
+                                attr { flexDirectionRow(); alignItemsCenter() }
+                                Image { attr { src(Icons.DELETE); width(14f); height(14f); marginRight(4f) } }
+                                Text { attr { text("删除"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.danger) } }
+                            }
                         }
                         View {
                             attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.primaryLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                             event { click { ctx.showBatchTagDialog() } }
-                            Text { attr { text("${Icons.TAG} 标签"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.primary) } }
+                            View {
+                                attr { flexDirectionRow(); alignItemsCenter() }
+                                Image { attr { src(Icons.TAG); width(14f); height(14f); marginRight(4f) } }
+                                Text { attr { text("标签"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.primary) } }
+                            }
                         }
                         View {
                             attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip) }
                             event { click { ctx.doBatchExport() } }
-                            Text { attr { text("${Icons.EXPORT} 导出"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                            View {
+                                attr { flexDirectionRow(); alignItemsCenter() }
+                                Image { attr { src(Icons.EXPORT); width(14f); height(14f); marginRight(4f) } }
+                                Text { attr { text("导出"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textTertiary) } }
+                            }
                         }
                     }
                 }
@@ -544,13 +661,10 @@ internal class NoteListPage : Pager() {
                         backgroundColor(ThemeColors.primary); justifyContentCenter(); alignItemsCenter() }
                     event {
                         click {
-                            val note = Note(id = UUID.generate(), title = "无标题笔记", content = "",
-                                createdAt = currentTimeString(), updatedAt = currentTimeString())
-                            AppRepo.repo.insertNote(note)
-                            ctx.openNoteEditor(note.id)
+                            ctx.openNoteEditor("")
                         }
                     }
-                    Text { attr { text(Icons.ADD); fontSize(28f); color(Color.WHITE) } }
+                    Image { attr { src(Icons.ADD); width(28f); height(28f) } }
                 }
             }
 
@@ -571,7 +685,6 @@ internal class NoteListPage : Pager() {
                     attr { width(pagerData.pageViewWidth); height(pagerData.pageViewHeight)
                         positionAbsolute(); top(0f); left(0f); backgroundColor(ThemeColors.overlay)
                         justifyContentCenter(); alignItemsCenter() }
-                    event { click { ctx.dismissConfirm() } }
                     View {
                         attr { width(300f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
                             padding(top = 24f, left = 24f, bottom = 24f, right = 24f) }
@@ -601,7 +714,6 @@ internal class NoteListPage : Pager() {
                         positionAbsolute(); top(0f); left(0f); backgroundColor(ThemeColors.overlay)
                         justifyContentCenter(); alignItemsCenter()
                     }
-                    event { click { ctx.showTagManage = false } }
                     View {
                         attr { width(320f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
                             padding(top = 20f, left = 20f, bottom = 20f, right = 20f) }
@@ -612,10 +724,57 @@ internal class NoteListPage : Pager() {
                             Text { attr { text(tag.name); fontSize(ThemeStyles.fontSizeBody); flex(1f) } }
                             View {
                                 attr { padding(top = 6f, left = 6f, bottom = 6f, right = 6f) }
-                                event { click { AppRepo.repo.deleteTag(tag.id); ctx.loadData(); ctx.refreshNotes() } }
-                                Text { attr { text(Icons.CLOSE); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textHint) } }
+                                event { click {
+                                    ctx.showConfirm(
+                                        "删除标签",
+                                        "确定删除标签「${tag.name}」吗？已有笔记不会被删除，但会移除此标签关联。",
+                                        {
+                                            AppRepo.repo.deleteTag(tag.id)
+                                            if (ctx.filterTagId == tag.id) {
+                                                ctx.filterTagId = null
+                                                ctx.filterTagName = "全部笔记"
+                                            }
+                                            ctx.loadData(); ctx.refreshNotes()
+                                        },
+                                        null
+                                    )
+                                } }
+                                Image { attr { src(Icons.CLOSE); width(18f); height(18f) } }
                             }
                         } }
+                        if (ctx.tags.isEmpty()) {
+                            Text { attr { text("暂无标签"); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textLight); marginTop(8f); marginBottom(8f); alignSelfStretch() } }
+                        }
+                        // 新建标签
+                        View {
+                            attr { flexDirectionRow(); marginTop(12f); alignItemsCenter() }
+                            View {
+                                attr { flex(1f); backgroundColor(ThemeColors.backgroundLight); borderRadius(ThemeStyles.borderRadiusChip)
+                                    padding(top = 6f, left = 8f, bottom = 6f, right = 8f) }
+                                Input {
+                                    attr { flex(1f); text(ctx.newTagName); fontSize(ThemeStyles.fontSizeBody)
+                                        placeholder("新建标签名称..."); placeholderColor(ThemeColors.textLight) }
+                                    event { textDidChange { ctx.newTagName = it.text } }
+                                }
+                            }
+                            View {
+                                attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                                    backgroundColor(ThemeColors.primary); borderRadius(ThemeStyles.borderRadiusChip); marginLeft(8f) }
+                                event { click {
+                                    if (ctx.newTagName.isNotBlank()) {
+                                        val existing = AppRepo.repo.getTagByName(ctx.newTagName)
+                                        if (existing == null) {
+                                            AppRepo.repo.insertTag(Tag(id = UUID.generate(), name = ctx.newTagName))
+                                            ctx.newTagName = ""
+                                            ctx.loadData(); ctx.refreshNotes()
+                                        } else {
+                                            ctx.showToast("标签「${ctx.newTagName}」已存在")
+                                        }
+                                    }
+                                } }
+                                Text { attr { text("添加"); fontSize(ThemeStyles.fontSizeCaption); color(Color.WHITE) } }
+                            }
+                        }
                         View {
                             attr { marginTop(16f); alignSelfStretch(); padding(top = 10f, bottom = 10f)
                                 backgroundColor(ThemeColors.primary); borderRadius(ThemeStyles.borderRadiusButton); alignItemsCenter() }
@@ -632,7 +791,6 @@ internal class NoteListPage : Pager() {
                     attr { width(pagerData.pageViewWidth); height(pagerData.pageViewHeight)
                         positionAbsolute(); top(0f); left(0f); backgroundColor(ThemeColors.overlay)
                         justifyContentCenter(); alignItemsCenter() }
-                    event { click { ctx.showBatchTagPicker = false } }
                     View {
                         attr { width(320f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
                             padding(top = 20f, left = 20f, bottom = 20f, right = 20f) }
@@ -664,14 +822,29 @@ internal class NoteListPage : Pager() {
         acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("NoteEditPage", params)
     }
 
-    /** Highlight search matches by prefixing with the search icon */
+    /**
+     * 高亮搜索匹配文本 — 将所有匹配关键词用「」包裹
+     * 由于 Kuikly Text 组件不支持 Span/富文本，采用包裹标记方式
+     */
     private fun buildHighlightedText(text: String, query: String): String {
         if (query.isBlank()) return text
-        val lowerText = text.lowercase()
         val lowerQuery = query.lowercase()
-        val idx = lowerText.indexOf(lowerQuery)
-        if (idx < 0) return text
-        return text.substring(0, idx) + Icons.SEARCH + text.substring(idx, idx + query.length.coerceAtMost(text.length - idx)) + text.substring((idx + query.length).coerceAtMost(text.length))
+        val lowerText = text.lowercase()
+        val sb = StringBuilder()
+        var start = 0
+        while (true) {
+            val idx = lowerText.indexOf(lowerQuery, start)
+            if (idx < 0) {
+                sb.append(text.substring(start))
+                break
+            }
+            sb.append(text.substring(start, idx))
+            sb.append("「")
+            sb.append(text.substring(idx, idx + query.length.coerceAtMost(text.length - idx)))
+            sb.append("」")
+            start = idx + query.length
+        }
+        return sb.toString()
     }
 }
 
@@ -680,4 +853,11 @@ private fun NoteRepository.SearchScope.displayName(): String = when (this) {
     NoteRepository.SearchScope.TITLE -> "标题"
     NoteRepository.SearchScope.CONTENT -> "内容"
     NoteRepository.SearchScope.TITLE_AND_CONTENT -> "全部"
+}
+
+/** 笔记排序方式 */
+private enum class SortBy(val displayName: String) {
+    UPDATED_TIME("更新时间"),
+    CREATED_TIME("创建时间"),
+    TITLE("标题")
 }

@@ -49,11 +49,15 @@ kotlin {
         val iosSimulatorArm64Main by getting
         // val ohosArm64Main by creating { dependsOn(commonMain) }
         val jsMain by getting
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 
 dependencies {
-    add("kspCommonMainMetadata", "com.tencent.kuikly-open:core-ksp:2.4.0-2.0.21")
     add("kspAndroid", "com.tencent.kuikly-open:core-ksp:2.4.0-2.0.21")
     add("kspIosX64", "com.tencent.kuikly-open:core-ksp:2.4.0-2.0.21")
     add("kspIosArm64", "com.tencent.kuikly-open:core-ksp:2.4.0-2.0.21")
@@ -94,5 +98,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    sourceSets {
+        named("main") {
+            assets.srcDirs("src/commonMain/assets")
+        }
     }
 }

@@ -99,3 +99,108 @@ object ThemeStyles {
     // 自动保存间隔 (ms)
     const val autoSaveInterval = 30_000L
 }
+
+/**
+ * 主题模式
+ */
+enum class ThemeMode {
+    LIGHT,
+    DARK,
+    SYSTEM
+}
+
+/**
+ * 窗口尺寸信息，用于响应式布局
+ */
+data class WindowInfo(val width: Float, val height: Float) {
+    val isCompact: Boolean get() = width < 600f
+}
+
+/**
+ * 颜色方案数据类，用于深色/浅色主题切换
+ */
+data class ThemeColorScheme(
+    val primary: Color,
+    val primaryLight: Color,
+    val background: Color,
+    val backgroundLight: Color,
+    val surface: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textTertiary: Color,
+    val textHint: Color,
+    val textPlaceholder: Color,
+    val textLight: Color,
+    val border: Color,
+    val chipBg: Color,
+    val danger: Color,
+    val dangerLight: Color,
+    val success: Color,
+    val successLight: Color,
+    val warning: Color,
+    val warningLight: Color,
+    val info: Color,
+    val infoLight: Color,
+    val overlay: Color,
+    val transparent: Color
+)
+
+/**
+ * 浅色主题颜色方案（基于现有常量）
+ */
+val ThemeColors.light: ThemeColorScheme
+    get() = ThemeColorScheme(
+        primary = primary,
+        primaryLight = primaryLight,
+        background = background,
+        backgroundLight = backgroundLight,
+        surface = surface,
+        textPrimary = textPrimary,
+        textSecondary = textSecondary,
+        textTertiary = textTertiary,
+        textHint = textHint,
+        textPlaceholder = textPlaceholder,
+        textLight = textLight,
+        border = border,
+        chipBg = chipBg,
+        danger = danger,
+        dangerLight = dangerLight,
+        success = success,
+        successLight = successLight,
+        warning = warning,
+        warningLight = warningLight,
+        info = info,
+        infoLight = infoLight,
+        overlay = overlay,
+        transparent = transparent
+    )
+
+/**
+ * 深色主题颜色方案
+ */
+val ThemeColors.dark: ThemeColorScheme
+    get() = ThemeColorScheme(
+        primary = primary,
+        primaryLight = Color(0xFF1A3A5CL),
+        background = darkBackground,
+        backgroundLight = darkSurface,
+        surface = darkSurface,
+        textPrimary = darkTextPrimary,
+        textSecondary = darkTextSecondary,
+        textTertiary = darkTextTertiary,
+        textHint = darkTextTertiary,
+        textPlaceholder = Color(0xFF555555L),
+        textLight = Color(0xFF777777L),
+        border = darkBorder,
+        chipBg = darkChipBg,
+        danger = danger,
+        dangerLight = darkDangerLight,
+        success = success,
+        successLight = darkSuccessLight,
+        warning = warning,
+        warningLight = darkWarningLight,
+        info = info,
+        infoLight = darkInfoLight,
+        overlay = overlay,
+        transparent = transparent
+    )
