@@ -6,8 +6,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
     <application
-        android:name=".NoteApp"
-        android:label="NoteApp"
+        android:name=".NTnotesApp"
+        android:label="NTnotes"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
         android:allowBackup="true">
 

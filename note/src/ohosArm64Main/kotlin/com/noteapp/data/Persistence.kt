@@ -6,7 +6,7 @@ import platform.posix.*
 
 actual fun savePersistentData(key: String, value: String) {
     try {
-        val dir = "/data/storage/el2/base/files/noteapp/"
+        val dir = "/data/storage/el2/base/files/ntnotes/"
         mkdir(dir, 0x1C0.toUShort())
         val filePath = "$dir$key"
         val fd = open(filePath, O_WRONLY or O_CREAT or O_TRUNC, 0x180.toUShort())
@@ -23,7 +23,7 @@ actual fun savePersistentData(key: String, value: String) {
 
 actual fun loadPersistentData(key: String): String {
     return try {
-        val filePath = "/data/storage/el2/base/files/noteapp/$key"
+        val filePath = "/data/storage/el2/base/files/ntnotes/$key"
         val fd = open(filePath, O_RDONLY)
         if (fd < 0) return ""
         val size = lseek(fd, 0, SEEK_END)

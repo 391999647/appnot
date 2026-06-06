@@ -189,7 +189,7 @@ internal class NoteListPage : Pager() {
             sb.appendLine("\n---\n")
         }
         val content = sb.toString()
-        val filename = "noteapp_export_${currentTimeString().replace(":", "-")}.md"
+        val filename = "ntnotes_export_${currentTimeString().replace(":", "-")}.md"
         com.noteapp.data.exportFile(filename, content, "text/markdown")
         selectedNoteIds.clear()
         isMultiSelectMode = false

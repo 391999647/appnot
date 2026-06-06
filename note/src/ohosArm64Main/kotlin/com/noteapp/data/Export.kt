@@ -6,7 +6,7 @@ import platform.posix.*
 
 actual fun exportFile(filename: String, content: String, mimeType: String) {
     try {
-        val dir = "/data/storage/el2/base/files/noteapp_exports/"
+        val dir = "/data/storage/el2/base/files/ntnotes_exports/"
         mkdir(dir, 0x1C0.toUShort()) // 0700
         val filePath = "$dir$filename"
         val fd = open(filePath, O_WRONLY or O_CREAT or O_TRUNC, 0x180.toUShort()) // 0600

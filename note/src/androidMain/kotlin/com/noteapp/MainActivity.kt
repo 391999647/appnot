@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
             initKuikly()
         } catch (e: Throwable) {
             val msg = "CRASH in MainActivity.onCreate: ${e.javaClass.name}: ${e.message}\n${e.stackTraceToString()}"
-            Log.e("NoteApp-CRASH", msg, e)
+            Log.e("NTnotes-CRASH", msg, e)
             logToFile("MainActivity.onCreate: $msg")
 
             // 启动崩溃展示页面
@@ -53,16 +53,16 @@ class MainActivity : ComponentActivity() {
      */
     private fun initKuikly() {
         // 手动注册所有页面
-        Log.d("NoteApp", "Registering pages...")
-        Log.d("NoteApp", "NoteListPage exists before reg? ${BridgeManager.isPageExist("NoteListPage")}")
+        Log.d("NTnotes", "Registering pages...")
+        Log.d("NTnotes", "NoteListPage exists before reg? ${BridgeManager.isPageExist("NoteListPage")}")
         BridgeManager.registerPageRouter("NoteListPage") { NoteListPage() }
         BridgeManager.registerPageRouter("NoteEditPage") { NoteEditPage() }
         BridgeManager.registerPageRouter("RecycleBinPage") { RecycleBinPage() }
-        Log.d("NoteApp", "NoteListPage exists after reg? ${BridgeManager.isPageExist("NoteListPage")}")
-        Log.d("NoteApp", "Pages registered. BridgeManager.init=${BridgeManager.isDidInit()}")
+        Log.d("NTnotes", "NoteListPage exists after reg? ${BridgeManager.isPageExist("NoteListPage")}")
+        Log.d("NTnotes", "Pages registered. BridgeManager.init=${BridgeManager.isDidInit()}")
         logToFile("Pages registered manually")
 
-        val bundleDir = File(filesDir, "noteapp").also { it.mkdirs() }
+        val bundleDir = File(filesDir, "ntnotes").also { it.mkdirs() }
 
         container = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
                 executeMode: KuiklyRenderCoreExecuteModeBase
             ) {
                 val msg = "Kuikly Unhandled: ${errorReason.name}\n${throwable.stackTraceToString()}"
-                Log.e("NoteApp", msg, throwable)
+                Log.e("NTnotes", msg, throwable)
                 logToFile(msg)
 
                 // Kuikly 内部异常也展示崩溃页面
@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
                 executeMode: KuiklyRenderCoreExecuteModeBase
             ) {
                 val status = if (isSucceed) "SUCCESS" else "FAILED"
-                Log.d("NoteApp", "Page load $status: errorReason=${errorReason?.name}")
+                Log.d("NTnotes", "Page load $status: errorReason=${errorReason?.name}")
 
                 if (!isSucceed) {
                     val msg = "页面加载失败: ${errorReason?.name}"
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
             logToFile("KuiklyRenderViewBaseDelegator created OK")
         } catch (e: Throwable) {
             val msg = "KuiklyRenderViewBaseDelegator init failed: ${e.javaClass.name}: ${e.message}"
-            Log.e("NoteApp-CRASH", msg, e)
+            Log.e("NTnotes-CRASH", msg, e)
             logToFile(msg)
             throw e
         }
@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
             logToFile("onAttach OK - page=NoteListPage")
         } catch (e: Throwable) {
             val msg = "onAttach failed: ${e.javaClass.name}: ${e.message}"
-            Log.e("NoteApp-CRASH", msg, e)
+            Log.e("NTnotes-CRASH", msg, e)
             logToFile(msg)
             throw e
         }

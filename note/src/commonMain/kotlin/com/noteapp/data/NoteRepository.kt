@@ -21,7 +21,7 @@ import kotlinx.serialization.json.Json
 class NoteRepository {
 
     companion object {
-        const val STORAGE_KEY = "noteapp_data"
+        const val STORAGE_KEY = "ntnotes_data"
         const val DATA_VERSION = 1
     }
 

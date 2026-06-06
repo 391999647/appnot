@@ -20,7 +20,7 @@ kotlin {
     js(IR) {
         browser {
             commonWebpackConfig {
-                outputFileName = "noteapp.js"
+                outputFileName = "ntnotes.js"
             }
         }
         binaries.executable()

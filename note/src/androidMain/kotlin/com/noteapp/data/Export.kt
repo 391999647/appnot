@@ -8,7 +8,7 @@ import java.io.File
 actual fun exportFile(filename: String, content: String, mimeType: String) {
     try {
         val ctx = AndroidContextHolder.applicationContext!!
-        val dir = File(ctx.filesDir, "noteapp_exports")
+        val dir = File(ctx.filesDir, "ntnotes_exports")
         dir.mkdirs()
         val file = File(dir, filename)
         file.writeText(content)
@@ -21,6 +21,6 @@ actual fun exportFile(filename: String, content: String, mimeType: String) {
         }
         ctx.startActivity(Intent.createChooser(intent, "分享 $filename"))
     } catch (e: Exception) {
-        Log.e("NoteApp", "exportFile failed: filename=$filename", e)
+        Log.e("NTnotes", "exportFile failed: filename=$filename", e)
     }
 }

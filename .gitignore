@@ -22,6 +22,11 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Build outputs
+*.apk
+*.aab
+*.ap_
+
 # Environment
 .env
 .env.local

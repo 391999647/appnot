@@ -8,7 +8,7 @@ import java.io.File
 
 private val appDir: File by lazy {
     val ctx = AndroidContextHolder.applicationContext!!
-    File(ctx.filesDir, "noteapp")
+        File(ctx.filesDir, "ntnotes")
 }
 
 private val masterKeyAlias: String by lazy {
@@ -34,7 +34,7 @@ actual fun savePersistentData(key: String, value: String) {
             outputStream.write(value.toByteArray(Charsets.UTF_8))
         }
     } catch (e: Exception) {
-        Log.e("NoteApp", "savePersistentData failed: key=$key", e)
+        Log.e("NTnotes", "savePersistentData failed: key=$key", e)
     }
 }
 
@@ -46,7 +46,7 @@ actual fun loadPersistentData(key: String): String {
             inputStream.readBytes().toString(Charsets.UTF_8)
         }
     } catch (e: Exception) {
-        Log.e("NoteApp", "loadPersistentData failed: key=$key", e)
+        Log.e("NTnotes", "loadPersistentData failed: key=$key", e)
         ""
     }
 }
