@@ -325,7 +325,7 @@ internal class NoteListPage : Pager() {
             View {
                 attr {
                     flexDirectionRow(); alignItemsCenter()
-                    padding(top = 12f, left = 16f, bottom = 12f, right = 16f)
+                    padding(top = 16f, left = 20f, bottom = 16f, right = 20f)
                     backgroundColor(ThemeColors.surface)
                 }
 
@@ -379,7 +379,7 @@ internal class NoteListPage : Pager() {
             // ========== 搜索范围选择器浮层 ==========
             if (ctx.showSearchScopePicker) {
                 View {
-                    attr { positionAbsolute(); top(52f); left(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 4f, bottom = 4f); zIndex(100) }
+                    attr { positionAbsolute(); top(56f); left(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 4f, bottom = 4f); zIndex(100) }
                     for (scope in NoteRepository.SearchScope.values()) {
                         View {
                             attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f); flexDirectionRow(); alignItemsCenter() }
@@ -396,7 +396,7 @@ internal class NoteListPage : Pager() {
             // ========== 搜索历史浮层 ==========
             if (ctx.showSearchHistory && ctx.searchHistory.isNotEmpty()) {
                 View {
-                    attr { positionAbsolute(); top(52f); left(16f); right(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 8f, bottom = 8f); zIndex(100) }
+                    attr { positionAbsolute(); top(56f); left(16f); right(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 8f, bottom = 8f); zIndex(100) }
                     View {
                         attr { flexDirectionRow(); justifyContentSpaceBetween(); alignItemsCenter(); padding(top = 4f, left = 16f, bottom = 8f, right = 16f) }
                         Text { attr { text("搜索历史"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textHint) } }
@@ -437,7 +437,7 @@ internal class NoteListPage : Pager() {
                 // 侧边栏
                 if (ctx.showSidebar) {
                     View {
-                        attr { width(ThemeStyles.sidebarWidth); flexDirectionColumn(); backgroundColor(ThemeColors.surface); padding(top = 8f) }
+                        attr { width(ThemeStyles.sidebarWidth); flexDirectionColumn(); backgroundColor(ThemeColors.surface); padding(top = 12f) }
 
                         View {
                             attr { flexDirectionRow(); justifyContentSpaceBetween(); alignItemsCenter()
@@ -452,7 +452,7 @@ internal class NoteListPage : Pager() {
                         }
 
                         View {
-                            attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f)
+                            attr { padding(top = 12f, left = 20f, bottom = 12f, right = 20f)
                                 backgroundColor(if (ctx.filterTagId == null) ThemeColors.primaryLight else ThemeColors.transparent) }
                             event { click { ctx.filterTagId = null; ctx.filterTagName = "全部笔记"; ctx.persistFilterTag(); ctx.refreshNotes() } }
                             Text { attr { text("全部笔记 (${AppRepo.repo.activeNoteCount()})"); fontSize(ThemeStyles.fontSizeBody)
@@ -461,7 +461,7 @@ internal class NoteListPage : Pager() {
 
                         for (tag in ctx.tags) {
                             View {
-                                attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f)
+                                attr { padding(top = 12f, left = 20f, bottom = 12f, right = 20f)
                                     backgroundColor(if (ctx.filterTagId == tag.id) ThemeColors.primaryLight else ThemeColors.transparent) }
                                 event { click { ctx.filterTagId = tag.id; ctx.filterTagName = tag.name; ctx.persistFilterTag(); ctx.refreshNotes() } }
                                 Text { attr { text("${tag.name} (${AppRepo.repo.getNotesForTag(tag.id).size})"); fontSize(ThemeStyles.fontSizeBody)
@@ -472,7 +472,7 @@ internal class NoteListPage : Pager() {
                         View { attr { height(1f); backgroundColor(ThemeColors.border); marginTop(8f); marginBottom(8f) } }
 
                         View {
-                            attr { padding(top = 12f, left = 16f, bottom = 12f, right = 16f); flexDirectionRow(); alignItemsCenter() }
+                            attr { padding(top = 14f, left = 20f, bottom = 14f, right = 20f); flexDirectionRow(); alignItemsCenter() }
                             event { click { ctx.acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage("RecycleBinPage", com.tencent.kuikly.core.nvi.serialization.json.JSONObject()) } }
                             View {
                                 attr { flexDirectionRow(); alignItemsCenter() }
@@ -486,15 +486,6 @@ internal class NoteListPage : Pager() {
                 // 笔记列表区
                 View {
                     attr { flex(1f); flexDirectionColumn() }
-
-                    // 侧边栏遮罩层
-                    if (ctx.showSidebar) {
-                        View {
-                            attr { positionAbsolute(); top(0f); left(0f); right(0f); bottom(0f)
-                                backgroundColor(ThemeColors.overlay); zIndex(50) }
-                            event { click { ctx.showSidebar = false } }
-                        }
-                    }
 
                     View {
                         attr { padding(top = 16f, left = 16f, bottom = 8f, right = 16f)
@@ -520,7 +511,7 @@ internal class NoteListPage : Pager() {
                     // ========== 排序选择器浮层 ==========
                     if (ctx.showSortPicker) {
                         View {
-                            attr { positionAbsolute(); top(52f); right(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 4f, bottom = 4f); zIndex(100) }
+                            attr { positionAbsolute(); top(56f); right(16f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard); padding(top = 4f, bottom = 4f); zIndex(100) }
                             for (sort in SortBy.entries) {
                                 View {
                                     attr { padding(top = 10f, left = 16f, bottom = 10f, right = 16f); flexDirectionRow(); alignItemsCenter() }
@@ -534,20 +525,23 @@ internal class NoteListPage : Pager() {
                         }
                     }
 
-                    List {
-                        attr { flex(1f); padding(top = 0f, left = 16f, bottom = 0f, right = 16f) }
-                        if (ctx.notes.isEmpty()) {
+                    if (ctx.notes.isEmpty()) {
+                        View {
+                            attr { flex(1f); padding(top = 0f, left = 16f, bottom = 0f, right = 16f) }
                             View {
-                                attr { flex(1f); alignItemsCenter(); justifyContentCenter(); paddingTop(80f) }
+                                attr { alignItemsCenter(); justifyContentCenter(); paddingTop(100f) }
                                 View {
-                                    attr { width(96f); height(96f); borderRadius(48f)
+                                    attr { width(120f); height(120f); borderRadius(60f)
                                         backgroundColor(ThemeColors.chipBg); justifyContentCenter(); alignItemsCenter() }
-                                    Image { attr { src(Icons.NOTE_EMPTY); width(64f); height(64f) } }
+                                    Image { attr { src(Icons.NOTE_EMPTY); width(72f); height(72f) } }
                                 }
                                 Text { attr { text(if (ctx.searchQuery.isNotBlank()) "未找到相关笔记" else "暂无笔记，点击右下角创建")
-                                    fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textLight); marginTop(16f); lineHeight(22f) } }
+                                    fontSize(ThemeStyles.fontSizeSubtitle); color(ThemeColors.textTertiary); marginTop(20f); lineHeight(24f) } }
                             }
-                        } else {
+                        }
+                    } else {
+                        List {
+                            attr { flex(1f); padding(top = 0f, left = 16f, bottom = 0f, right = 16f) }
                             val tagsMap = AppRepo.repo.getTagsForNotes(ctx.notes.map { it.id })
                             for (note in ctx.notes) {
                                 val noteTags = tagsMap[note.id] ?: emptyList()
@@ -566,7 +560,7 @@ internal class NoteListPage : Pager() {
                                     }
                                     View {
                                         attr { flex(1f); flexDirectionColumn(); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
-                                            padding(top = 14f, left = 16f, bottom = 14f, right = 16f); marginBottom(10f) }
+                                            padding(top = 16f, left = 20f, bottom = 16f, right = 20f); marginBottom(12f) }
                                         if (ctx.isMultiSelectMode) {
                                             event { click { ctx.toggleNoteSelection(note.id) } }
                                         } else {
@@ -596,14 +590,14 @@ internal class NoteListPage : Pager() {
                                                 } else {
                                                     contentPreview + if (note.content.length > 100) "..." else ""
                                                 }
-                                                attr { text(previewText); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textHint); marginTop(4f); lines(2) }
+                                                attr { text(previewText); fontSize(ThemeStyles.fontSizeBody); color(ThemeColors.textTertiary); marginTop(6f); lines(2) }
                                             }
                                         }
 
                                         if (noteTags.isNotEmpty()) { View {
                                             attr { flexDirectionRow(); marginTop(8f); flexWrapWrap() }
                                             for (tag in noteTags) { View {
-                                                attr { padding(top = 2f, left = 8f, bottom = 2f, right = 8f)
+                                                attr { padding(top = 4f, left = 10f, bottom = 4f, right = 10f)
                                                     backgroundColor(ThemeColors.primaryLight); borderRadius(ThemeStyles.borderRadiusTag); marginRight(6f); marginTop(4f) }
                                                 Text { attr { text(tag.name); fontSize(ThemeStyles.fontSizeSmall); color(ThemeColors.primary) } }
                                             } }
@@ -620,11 +614,11 @@ internal class NoteListPage : Pager() {
             if (ctx.isMultiSelectMode && ctx.selectedNoteIds.isNotEmpty()) {
                 View {
                     attr { flexDirectionRow(); alignItemsCenter(); justifyContentSpaceBetween()
-                        padding(top = 8f, left = 16f, bottom = 8f, right = 16f)
+                        padding(top = 12f, left = 20f, bottom = 12f, right = 20f)
                         backgroundColor(ThemeColors.surface) }
                     View { attr { flexDirectionRow(); alignItemsCenter() }
                         View {
-                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
+                            attr { padding(top = 8f, left = 16f, bottom = 8f, right = 16f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                             event { click { ctx.batchDelete() } }
                             View {
                                 attr { flexDirectionRow(); alignItemsCenter() }
@@ -633,7 +627,7 @@ internal class NoteListPage : Pager() {
                             }
                         }
                         View {
-                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.primaryLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
+                            attr { padding(top = 8f, left = 16f, bottom = 8f, right = 16f); backgroundColor(ThemeColors.primaryLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                             event { click { ctx.showBatchTagDialog() } }
                             View {
                                 attr { flexDirectionRow(); alignItemsCenter() }
@@ -642,7 +636,7 @@ internal class NoteListPage : Pager() {
                             }
                         }
                         View {
-                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip) }
+                            attr { padding(top = 8f, left = 16f, bottom = 8f, right = 16f); backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip) }
                             event { click { ctx.doBatchExport() } }
                             View {
                                 attr { flexDirectionRow(); alignItemsCenter() }
@@ -657,7 +651,7 @@ internal class NoteListPage : Pager() {
             // ========== FAB ==========
             if (!ctx.isMultiSelectMode) {
                 View {
-                    attr { positionAbsolute(); bottom(24f); right(24f); width(ThemeStyles.fabSize); height(ThemeStyles.fabSize); borderRadius(28f)
+                    attr { positionAbsolute(); bottom(28f); right(28f); width(ThemeStyles.fabSize); height(ThemeStyles.fabSize); borderRadius(28f)
                         backgroundColor(ThemeColors.primary); justifyContentCenter(); alignItemsCenter() }
                     event {
                         click {

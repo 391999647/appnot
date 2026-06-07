@@ -75,20 +75,20 @@ fun ViewContainer<*, *>.AppToast(
     hasFab: Boolean = false
 ) {
     if (visible) {
-        val bottomOffset = if (hasFab) 80f else 24f
+        val bottomOffset = if (hasFab) 88f else 28f
         View {
             attr {
                 positionAbsolute()
                 bottom(bottomOffset)
-                left(32f)
-                right(32f)
+                left(24f)
+                right(24f)
                 alignItemsCenter()
             }
             View {
                 attr {
-                    backgroundColor(Color(0xE0000000L))
-                    borderRadius(ThemeStyles.borderRadiusCard)
-                    padding(top = 10f, left = 20f, bottom = 10f, right = 20f)
+                    backgroundColor(Color(0xEE0F172AL))
+                    borderRadius(ThemeStyles.borderRadiusChip)
+                    padding(top = 12f, left = 22f, bottom = 12f, right = 22f)
                 }
                 Text {
                     attr {

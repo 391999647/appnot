@@ -31,3 +31,12 @@ Thumbs.db
 .env
 .env.local
 local.properties
+
+# OpenCode config (contains API keys)
+opencode.jsonc
+
+# OpenCode working data
+.omo/
+
+# Screenshots (repo root only)
+/2026-06-07*.png

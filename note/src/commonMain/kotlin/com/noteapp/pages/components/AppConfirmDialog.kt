@@ -55,17 +55,17 @@ fun ViewContainer<*, *>.AppConfirmDialog(
             // 遮罩层不绑定 click 事件，防止误触关闭
             View {
                 attr {
-                    width(300f)
+                    width(312f)
                     backgroundColor(ThemeColors.surface)
                     borderRadius(ThemeStyles.borderRadiusCard)
-                    padding(top = 24f, left = 24f, bottom = 24f, right = 24f)
+                    padding(top = 24f, left = 22f, bottom = 22f, right = 22f)
                 }
                 Text {
                     attr {
                         text(title)
                         fontSize(ThemeStyles.fontSizeSubtitle)
                         fontWeightBold()
-                        marginBottom(8f)
+                        marginBottom(10f)
                         color(ThemeColors.textPrimary)
                     }
                 }
@@ -74,7 +74,7 @@ fun ViewContainer<*, *>.AppConfirmDialog(
                         text(message)
                         fontSize(ThemeStyles.fontSizeBody)
                         color(ThemeColors.textSecondary)
-                        marginBottom(24f)
+                        marginBottom(22f)
                     }
                 }
                 View {
@@ -84,7 +84,7 @@ fun ViewContainer<*, *>.AppConfirmDialog(
                     }
                     View {
                         attr {
-                            padding(top = 8f, left = 20f, bottom = 8f, right = 20f)
+                            padding(top = 10f, left = 20f, bottom = 10f, right = 20f)
                             backgroundColor(ThemeColors.chipBg)
                             borderRadius(ThemeStyles.borderRadiusButton)
                             marginRight(12f)
@@ -100,7 +100,7 @@ fun ViewContainer<*, *>.AppConfirmDialog(
                     }
                     View {
                         attr {
-                            padding(top = 8f, left = 20f, bottom = 8f, right = 20f)
+                            padding(top = 10f, left = 20f, bottom = 10f, right = 20f)
                             backgroundColor(
                                 if (confirmStyle == DialogConfirmStyle.Danger) ThemeColors.danger else ThemeColors.primary
                             )

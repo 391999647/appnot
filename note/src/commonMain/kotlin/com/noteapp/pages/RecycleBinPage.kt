@@ -149,7 +149,7 @@ internal class RecycleBinPage : Pager() {
             View {
                 attr {
                     flexDirectionRow(); alignItemsCenter()
-                    padding(top = 12f, left = 16f, bottom = 12f, right = 16f)
+                    padding(top = 16f, left = 20f, bottom = 16f, right = 20f)
                     backgroundColor(ThemeColors.surface)
                 }
                 View {
@@ -212,11 +212,11 @@ internal class RecycleBinPage : Pager() {
                     for (note in ctx.deletedNotes) {
                         val isSelected = ctx.selectedNoteIds.contains(note.id)
                         View {
-                            attr {
-                                flexDirectionRow(); alignItemsCenter()
-                                backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
-                                padding(top = 12f, left = 16f, bottom = 12f, right = 16f); marginBottom(8f)
-                            }
+                                attr {
+                                    flexDirectionRow(); alignItemsCenter()
+                                    backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
+                                    padding(top = 16f, left = 20f, bottom = 16f, right = 20f); marginBottom(12f)
+                                }
                             if (ctx.isMultiSelectMode) {
                                 View {
                                     attr { padding(right = 10f) }
@@ -244,7 +244,7 @@ internal class RecycleBinPage : Pager() {
                                         fontSize(ThemeStyles.fontSizeSmall); color(ThemeColors.textLight); marginTop(4f) } }
                                 }
                                 View {
-                                    attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                                    attr { padding(top = 8f, left = 14f, bottom = 8f, right = 14f)
                                         backgroundColor(ThemeColors.successLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                                     event { click { AppRepo.repo.restoreNote(note.id); ctx.loadDeletedNotes(); ctx.showToast("已恢复「${note.title.ifBlank { "无标题笔记" }}」") } }
                                     View {
@@ -254,7 +254,7 @@ internal class RecycleBinPage : Pager() {
                                     }
                                 }
                                 View {
-                                    attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                                    attr { padding(top = 8f, left = 14f, bottom = 8f, right = 14f)
                                         backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
                                     event { click { ctx.showConfirm("永久删除", "确定要永久删除「${note.title.ifBlank { "无标题笔记" }}」吗？此操作不可恢复。") { AppRepo.repo.permanentlyDeleteNote(note.id); ctx.loadDeletedNotes(); ctx.showToast("已永久删除") } } }
                                     View {
@@ -272,12 +272,12 @@ internal class RecycleBinPage : Pager() {
             // ========== 批量操作工具栏 ==========
             if (ctx.isMultiSelectMode && ctx.selectedNoteIds.isNotEmpty()) {
                 View {
-                    attr { flexDirectionRow(); alignItemsCenter(); justifyContentSpaceBetween()
-                        padding(top = 8f, left = 16f, bottom = 8f, right = 16f)
-                        backgroundColor(ThemeColors.surface) }
+                attr { flexDirectionRow(); alignItemsCenter(); justifyContentSpaceBetween()
+                    padding(top = 12f, left = 20f, bottom = 12f, right = 20f)
+                    backgroundColor(ThemeColors.surface) }
                     View { attr { flexDirectionRow(); alignItemsCenter() }
                         View {
-                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.successLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
+                            attr { padding(top = 8f, left = 16f, bottom = 8f, right = 16f); backgroundColor(ThemeColors.successLight); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                             event { click { ctx.batchRestore() } }
                             View {
                                 attr { flexDirectionRow(); alignItemsCenter() }
@@ -286,7 +286,7 @@ internal class RecycleBinPage : Pager() {
                             }
                         }
                         View {
-                            attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
+                            attr { padding(top = 8f, left = 16f, bottom = 8f, right = 16f); backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
                             event { click { ctx.batchDeletePermanently() } }
                             View {
                                 attr { flexDirectionRow(); alignItemsCenter() }

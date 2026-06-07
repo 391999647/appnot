@@ -6,32 +6,32 @@ import com.tencent.kuikly.core.base.Color
  * 统一主题色常量
  */
 object ThemeColors {
-    val primary = Color(0xFF4A90D9L)
-    val primaryLight = Color(0xFFE8F0FEL)
+    val primary = Color(0xFF2563EBL)
+    val primaryLight = Color(0xFFEFF6FFL)
 
-    val background = Color(0xFFF5F5F5L)
-    val backgroundLight = Color(0xFFFAFAFAL)
+    val background = Color(0xFFF8FAFCL)
+    val backgroundLight = Color(0xFFF1F5F9L)
     val surface = Color.WHITE
 
-    val textPrimary = Color(0xFF333333L)
-    val textSecondary = Color(0xFF555555L)
-    val textTertiary = Color(0xFF666666L)
-    val textHint = Color(0xFF999999L)
-    val textPlaceholder = Color(0xFFCCCCCCL)
-    val textLight = Color(0xFFBBBBBBL)
+    val textPrimary = Color(0xFF0F172AL)
+    val textSecondary = Color(0xFF334155L)
+    val textTertiary = Color(0xFF64748BL)
+    val textHint = Color(0xFF94A3B8L)
+    val textPlaceholder = Color(0xFFCBD5E1L)
+    val textLight = Color(0xFF94A3B8L)
 
-    val border = Color(0xFFE0E0E0L)
-    val chipBg = Color(0xFFF0F0F0L)
+    val border = Color(0xFFE2E8F0L)
+    val chipBg = Color(0xFFF1F5F9L)
 
-    val danger = Color(0xFFE06060L)
-    val dangerLight = Color(0xFFFFF0F0L)
-    val success = Color(0xFF50C050L)
-    val successLight = Color(0xFFE8FCE8L)
+    val danger = Color(0xFFDC2626L)
+    val dangerLight = Color(0xFFFEF2F2L)
+    val success = Color(0xFF16A34AL)
+    val successLight = Color(0xFFF0FDF4L)
 
-    val warning = Color(0xFFFF9500L)
-    val warningLight = Color(0xFFFFF8E1L)
-    val info = Color(0xFF2196F3L)
-    val infoLight = Color(0xFFE3F2FDL)
+    val warning = Color(0xFFF59E0BL)
+    val warningLight = Color(0xFFFFFBEBL)
+    val info = Color(0xFF0284C7L)
+    val infoLight = Color(0xFFE0F2FEL)
 
     val overlay = Color(0x80000000L)
     val transparent = Color.TRANSPARENT
@@ -55,23 +55,23 @@ object ThemeColors {
  */
 object ThemeStyles {
     // 圆角规范
-    const val borderRadiusButton = 8f
-    const val borderRadiusCard = 12f
-    const val borderRadiusTag = 10f
-    const val borderRadiusInput = 8f
-    const val borderRadiusChip = 6f
+    const val borderRadiusButton = 12f
+    const val borderRadiusCard = 18f
+    const val borderRadiusTag = 999f
+    const val borderRadiusInput = 14f
+    const val borderRadiusChip = 999f
 
     // 间距规范
     const val spacingPageHorizontal = 16f
     const val spacingPageVertical = 16f
     const val spacingComponentVertical = 8f
     const val spacingComponentHorizontal = 8f
-    const val spacingInnerPadding = 12f
+    const val spacingInnerPadding = 14f
 
     // 字体大小规范
-    const val fontSizeTitle = 20f
-    const val fontSizeSubtitle = 18f
-    const val fontSizeBody = 14f
+    const val fontSizeTitle = 22f
+    const val fontSizeSubtitle = 17f
+    const val fontSizeBody = 15f
     const val fontSizeCaption = 12f
     const val fontSizeSmall = 11f
 

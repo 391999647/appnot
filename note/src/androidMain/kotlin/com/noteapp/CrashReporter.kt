@@ -186,4 +186,14 @@ object CrashReporter {
             emptyList()
         }
     }
+
+    fun clearCrashFiles(context: Context) {
+        listCrashFiles(context).forEach { file ->
+            try {
+                file.delete()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete crash file: ${file.name}", e)
+            }
+        }
+    }
 }

@@ -148,7 +148,7 @@ class CrashActivity : ComponentActivity() {
         }
 
         val clearBtn = createActionButton("🗑️ 清空日志") {
-            deleteFile(CrashReporter.listCrashFiles(this@CrashActivity).firstOrNull()?.name ?: "crash_report.txt")
+            CrashReporter.clearCrashFiles(this@CrashActivity)
             Toast.makeText(this@CrashActivity, "日志已清空", Toast.LENGTH_SHORT).show()
             finishAffinity()
         }

@@ -15,9 +15,10 @@ import com.tencent.kuikly.core.views.Input
 import com.tencent.kuikly.core.views.TextArea
 import com.tencent.kuikly.core.module.RouterModule
 import com.noteapp.AppRepo
+import com.noteapp.data.NoteRepository
 import com.noteapp.data.exportFile
-import com.noteapp.data.savePersistentData
 import com.noteapp.data.loadPersistentData
+import com.noteapp.data.savePersistentData
 import com.noteapp.model.Note
 import com.noteapp.model.Tag
 import com.noteapp.theme.ThemeColors
@@ -102,6 +103,7 @@ internal class NoteEditPage : Pager() {
         super.pageWillDestroy()
         cancelAutoSave()
         saveDraft()
+        AppRepo.repo.flushChanges()
         toastTimerRef?.let { clearTimeout(it) }
         toastTimerRef = null
         previewDebounceRef?.let { clearTimeout(it) }
@@ -192,7 +194,7 @@ internal class NoteEditPage : Pager() {
         saveStatus = SaveState.SAVED
         isDraft = false
         // Clear draft after successful save
-        savePersistentData("draft_$noteId", "")
+        AppRepo.repo.clearDraft(noteId)
     }
 
     private fun doSaveAndClose() {
@@ -206,13 +208,13 @@ internal class NoteEditPage : Pager() {
         showConfirmDialog("删除笔记", "确定要删除「${title.ifBlank { "无标题笔记" }}」吗？删除后可在回收站恢复。") {
             cancelAutoSave()
             AppRepo.repo.softDeleteNote(noteId, currentTimeString())
-            savePersistentData("draft_$noteId", "")
+            AppRepo.repo.clearDraft(noteId)
             acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()
         }
     }
 
     private fun doExportFormat(format: String) {
-        val safeTitle = sanitizeFileName(title.ifBlank { "无标题笔记" })
+        val safeTitle = NoteRepository.sanitizeFileName(title.ifBlank { "无标题笔记" })
         when (format) {
             "Markdown (.md)" -> exportFile("${safeTitle}.md", "# $title\n\n$content", "text/markdown")
             "纯文本 (.txt)" -> exportFile("${safeTitle}.txt", "$title\n\n$content", "text/plain")
@@ -263,15 +265,6 @@ internal class NoteEditPage : Pager() {
         confirmTitle = ""
         confirmMessage = ""
         confirmAction = null
-    }
-
-    private fun sanitizeFileName(name: String): String {
-        val invalidChars = Regex("[/\\\\:*?\"<>|\r\n]")
-        var sanitized = invalidChars.replace(name, "_")
-        if (sanitized.length > 80) {
-            sanitized = sanitized.substring(0, 80)
-        }
-        return sanitized
     }
 
     // ========== Markdown 预览内联格式解析 ==========
@@ -351,7 +344,7 @@ internal class NoteEditPage : Pager() {
             View {
                 attr {
                     flexDirectionRow(); alignItemsCenter(); justifyContentSpaceBetween()
-                    padding(top = 10f, left = 16f, bottom = 10f, right = 16f)
+                    padding(top = 14f, left = 20f, bottom = 14f, right = 20f)
                     backgroundColor(ThemeColors.surface)
                 }
 
@@ -380,7 +373,7 @@ internal class NoteEditPage : Pager() {
 
                 View { attr { flexDirectionRow(); alignItemsCenter() }
                     View {
-                        attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                        attr { padding(top = 8f, left = 14f, bottom = 8f, right = 14f)
                             backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                         event { click { ctx.showTagPicker = true; ctx.loadTags() } }
                         View {
@@ -390,7 +383,7 @@ internal class NoteEditPage : Pager() {
                         }
                     }
                     View {
-                        attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                        attr { padding(top = 8f, left = 14f, bottom = 8f, right = 14f)
                             backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                         event { click { ctx.showPreview = !ctx.showPreview } }
                         View {
@@ -400,7 +393,7 @@ internal class NoteEditPage : Pager() {
                         }
                     }
                     View {
-                        attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                        attr { padding(top = 8f, left = 14f, bottom = 8f, right = 14f)
                             backgroundColor(ThemeColors.chipBg); borderRadius(ThemeStyles.borderRadiusChip); marginRight(8f) }
                         event { click { ctx.showExportMenu = true } }
                         View {
@@ -410,7 +403,7 @@ internal class NoteEditPage : Pager() {
                         }
                     }
                     View {
-                        attr { padding(top = 6f, left = 12f, bottom = 6f, right = 12f)
+                        attr { padding(top = 8f, left = 14f, bottom = 8f, right = 14f)
                             backgroundColor(ThemeColors.dangerLight); borderRadius(ThemeStyles.borderRadiusChip) }
                         event { click { ctx.doDelete() } }
                         View {
@@ -428,7 +421,7 @@ internal class NoteEditPage : Pager() {
 
                 // 编辑区
                 View {
-                    attr { flex(1f); flexDirectionColumn(); padding(top = 16f, left = 20f, right = 10f) }
+                    attr { flex(1f); flexDirectionColumn(); padding(top = 20f, left = 24f, right = 12f) }
 
                     Input {
                         attr {
@@ -452,7 +445,7 @@ internal class NoteEditPage : Pager() {
                 if (ctx.showPreview) {
                     View {
                         attr { flex(1f); flexDirectionColumn(); backgroundColor(ThemeColors.surface)
-                            padding(top = 16f, left = 16f, bottom = 16f, right = 16f) }
+                            padding(top = 20f, left = 20f, bottom = 20f, right = 20f) }
                         Text { attr { text("预览"); fontSize(ThemeStyles.fontSizeCaption); color(ThemeColors.textLight); marginBottom(8f) } }
                         List {
                             attr { flex(1f) }
@@ -510,7 +503,7 @@ internal class NoteEditPage : Pager() {
             // ========== 底部标签栏 ==========
             View {
                 attr { flexDirectionRow(); alignItemsCenter(); justifyContentSpaceBetween()
-                    padding(top = 8f, left = 16f, bottom = 8f, right = 16f); backgroundColor(ThemeColors.surface) }
+                    padding(top = 12f, left = 20f, bottom = 12f, right = 20f); backgroundColor(ThemeColors.surface) }
 
                 View { attr { flexDirectionRow(); flex(1f); flexWrapWrap() }
                     for (tag in ctx.noteTags) {
@@ -537,9 +530,9 @@ internal class NoteEditPage : Pager() {
                         justifyContentCenter(); alignItemsCenter() }
                     event { click { ctx.showTagPicker = false } }
                     View {
-                        attr { width(320f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
-                            padding(top = 20f, left = 20f, bottom = 20f, right = 20f) }
-                        Text { attr { text("选择标签"); fontSize(ThemeStyles.fontSizeSubtitle); fontWeightBold(); marginBottom(16f) } }
+                    attr { width(340f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
+                        padding(top = 24f, left = 24f, bottom = 24f, right = 24f) }
+                    Text { attr { text("选择标签"); fontSize(ThemeStyles.fontSizeSubtitle); fontWeightBold(); marginBottom(20f) } }
                         for (tag in ctx.allTags) {
                             val isSelected = ctx.noteTags.any { it.id == tag.id }
                             View {
@@ -595,8 +588,8 @@ internal class NoteEditPage : Pager() {
                         justifyContentCenter(); alignItemsCenter() }
                     event { click { ctx.showExportMenu = false } }
                     View {
-                        attr { width(280f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
-                            padding(top = 20f, left = 20f, bottom = 20f, right = 20f) }
+                    attr { width(300f); backgroundColor(ThemeColors.surface); borderRadius(ThemeStyles.borderRadiusCard)
+                        padding(top = 24f, left = 24f, bottom = 24f, right = 24f) }
                         Text { attr { text("导出笔记"); fontSize(ThemeStyles.fontSizeSubtitle); fontWeightBold(); marginBottom(16f) } }
                         for (format in listOf("Markdown (.md)", "纯文本 (.txt)", "JSON (.json)")) { View {
                             attr { padding(top = 12f, bottom = 12f); flexDirectionRow(); alignItemsCenter() }

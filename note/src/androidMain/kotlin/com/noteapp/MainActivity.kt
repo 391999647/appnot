@@ -1,6 +1,9 @@
 package com.noteapp
 
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
 import android.widget.FrameLayout
@@ -13,11 +16,16 @@ import com.noteapp.pages.NoteListPage
 import com.noteapp.pages.RecycleBinPage
 import com.tencent.kuikly.core.manager.BridgeManager
 import com.tencent.kuikly.core.render.android.IKuiklyRenderExport
+import com.tencent.kuikly.core.render.android.adapter.HRImageLoadOption
+import com.tencent.kuikly.core.render.android.adapter.IKRImageAdapter
+import com.tencent.kuikly.core.render.android.adapter.IKRRouterAdapter
+import com.tencent.kuikly.core.render.android.adapter.KuiklyRenderAdapterManager
 import com.tencent.kuikly.core.render.android.context.KuiklyRenderCoreExecuteModeBase
 import com.tencent.kuikly.core.render.android.exception.ErrorReason
 import com.tencent.kuikly.core.render.android.expand.KuiklyRenderViewBaseDelegator
 import com.tencent.kuikly.core.render.android.expand.KuiklyRenderViewBaseDelegatorDelegate
 import com.tencent.kuikly.core.render.android.performace.KRMonitorType
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -32,6 +40,8 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var kuiklyRenderViewDelegator: KuiklyRenderViewBaseDelegator
     private lateinit var container: FrameLayout
+
+    private data class PageState(val pageName: String, val pageData: Map<String, Any>)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,7 +82,44 @@ class MainActivity : ComponentActivity() {
         }
         setContentView(container)
 
-        val delegate = object : KuiklyRenderViewBaseDelegatorDelegate {
+        val initialPageData = mapOf<String, Any>(
+            "appId" to 1,
+            "debug" to 1
+        )
+        val pageStack = mutableListOf<PageState>()
+        var currentPage = PageState("NoteListPage", initialPageData)
+
+        lateinit var delegate: KuiklyRenderViewBaseDelegatorDelegate
+
+        fun attachPage(pageName: String, pageData: Map<String, Any>) {
+            if (::kuiklyRenderViewDelegator.isInitialized) {
+                kuiklyRenderViewDelegator.onDetach()
+                container.removeAllViews()
+            }
+            kuiklyRenderViewDelegator = KuiklyRenderViewBaseDelegator(delegate)
+            kuiklyRenderViewDelegator.onAttach(
+                container,
+                bundleDir.absolutePath,
+                pageName,
+                pageData
+            )
+            currentPage = PageState(pageName, pageData)
+            logToFile("onAttach OK - page=$pageName")
+        }
+
+        fun openKuiklyPage(pageName: String, pageData: Map<String, Any>) {
+            pageStack.add(currentPage)
+            attachPage(pageName, pageData)
+        }
+
+        fun closeKuiklyPage() {
+            val previous = pageStack.removeLastOrNull() ?: PageState("NoteListPage", initialPageData)
+            attachPage(previous.pageName, previous.pageData)
+        }
+
+        registerKuiklyAdapters(::openKuiklyPage, ::closeKuiklyPage)
+
+        delegate = object : KuiklyRenderViewBaseDelegatorDelegate {
             override fun coreExecuteModeX(): KuiklyRenderCoreExecuteModeBase {
                 return KuiklyRenderCoreExecuteModeBase.JVM
             }
@@ -115,30 +162,9 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            kuiklyRenderViewDelegator = KuiklyRenderViewBaseDelegator(delegate)
-            logToFile("KuiklyRenderViewBaseDelegator created OK")
+            attachPage(currentPage.pageName, currentPage.pageData)
         } catch (e: Throwable) {
-            val msg = "KuiklyRenderViewBaseDelegator init failed: ${e.javaClass.name}: ${e.message}"
-            Log.e("NTnotes-CRASH", msg, e)
-            logToFile(msg)
-            throw e
-        }
-
-        val pageData = mapOf<String, Any>(
-            "appId" to 1,
-            "debug" to 1
-        )
-
-        try {
-            kuiklyRenderViewDelegator.onAttach(
-                container,
-                bundleDir.absolutePath,
-                "NoteListPage",
-                pageData
-            )
-            logToFile("onAttach OK - page=NoteListPage")
-        } catch (e: Throwable) {
-            val msg = "onAttach failed: ${e.javaClass.name}: ${e.message}"
+            val msg = "Kuikly page attach failed: ${e.javaClass.name}: ${e.message}"
             Log.e("NTnotes-CRASH", msg, e)
             logToFile(msg)
             throw e
@@ -152,6 +178,70 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
+    }
+
+    private fun registerKuiklyAdapters(
+        openPage: (String, Map<String, Any>) -> Unit,
+        closePage: () -> Unit
+    ) {
+        KuiklyRenderAdapterManager.krImageAdapter = object : IKRImageAdapter {
+            override fun fetchDrawable(
+                options: HRImageLoadOption,
+                callback: (Drawable?) -> Unit
+            ) {
+                fetchDrawable(options, null, callback)
+            }
+
+            override fun fetchDrawable(
+                options: HRImageLoadOption,
+                imageParams: JSONObject?,
+                callback: (Drawable?) -> Unit
+            ) {
+                callback(loadDrawable(options.src))
+            }
+
+            override val shouldWaitViewDidLoad: Boolean = false
+        }
+
+        KuiklyRenderAdapterManager.krRouterAdapter = object : IKRRouterAdapter {
+            override fun openPage(context: android.content.Context, pageName: String, pageData: JSONObject) {
+                openPage(pageName, pageData.toMap())
+            }
+
+            override fun closePage(context: android.content.Context) {
+                closePage()
+            }
+        }
+    }
+
+    private fun loadDrawable(src: String): Drawable? {
+        return try {
+            val bitmap = when {
+                src.startsWith("assets://") -> {
+                    val assetPath = src.removePrefix("assets://")
+                    assets.open(assetPath).use { BitmapFactory.decodeStream(it) }
+                }
+                src.startsWith("file://") -> BitmapFactory.decodeFile(src.removePrefix("file://"))
+                else -> null
+            } ?: return null
+            BitmapDrawable(resources, bitmap)
+        } catch (e: Throwable) {
+            Log.e("NTnotes", "Failed to load image: $src", e)
+            null
+        }
+    }
+
+    private fun JSONObject.toMap(): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+        val keys = keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val value = opt(key)
+            if (value != null && value != JSONObject.NULL) {
+                result[key] = value
+            }
+        }
+        return result
     }
 
     /**

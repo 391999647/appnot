@@ -7,7 +7,10 @@ import java.io.File
 
 actual fun exportFile(filename: String, content: String, mimeType: String) {
     try {
-        val ctx = AndroidContextHolder.applicationContext!!
+        val ctx = AndroidContextHolder.applicationContext ?: run {
+            Log.e("NTnotes", "exportFile failed: Android context unavailable")
+            return
+        }
         val dir = File(ctx.filesDir, "ntnotes_exports")
         dir.mkdirs()
         val file = File(dir, filename)
